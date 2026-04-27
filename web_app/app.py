@@ -138,5 +138,6 @@ elif page == "ℹ️ О проекте":
     - **Backend:** Yandex Managed PostgreSQL
     - **Frontend:** Streamlit Framework
     - **Data:** Selenium & BeautifulSoup (Парсинг WB)
+    
     """)
     st.image("https://huggingface.co/front/assets/huggingface_logo-noborder.svg", width=100)
