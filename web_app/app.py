@@ -55,7 +55,7 @@ def get_all_products():
             'category': ['Электроника', 'Электроника', 'Аксессуары']
         })
 
-
+# --- КАСТОМНЫЙ CSS (Для стиля как на картинке) ---
 st.markdown("""
     <style>
     /* 1. Навигация и Sidebar */
@@ -131,6 +131,11 @@ def color_sentiment(val):
         color = '#757575'  # Серый
     return f'background-color: {color}; color: white; border-radius: 4px; padding: 2px 5px;'
 
+# --- БОКОВАЯ ПАНЕЛЬ (SIDEBAR) ---
+with st.sidebar:
+    st.title("📂 InsightCopy AI")
+    page = st.radio("Навигация", ["🏠 Главная", "📈 Аналитика", "ℹ️ О проекте"])
+    st.divider()
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if page == "🏠 Главная":
