@@ -55,109 +55,154 @@ def get_all_products():
             'category': ['Электроника', 'Электроника', 'Аксессуары']
         })
 
-# --- КАСТОМНЫЙ CSS (Для стиля как на картинке) ---
+
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button {
-        background-color: #00c853;
-        color: white;
-        border-radius: 5px;
-        border: none;
-        padding: 0.5rem 2rem;
+    /* 1. Навигация и Sidebar */
+    [data-testid="stSidebar"] {
+        min-width: 200px;
+        max-width: 250px;
+        background-color: #161b22; /* Темный оттенок для sidebar */
     }
-    .card {
-        background-color: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        border: 1px solid #e0e0e0;
-        margin-bottom: 1rem;
+
+    /* Убираем красные точки и стилизуем активный пункт */
+    .stRadio [data-testid="stWidgetLabel"] { display: none; }
+    div[role="radiogroup"] label {
+        background: transparent;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        transition: 0.3s;
+    }
+    div[role="radiogroup"] label:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* 2. Компоненты управления (Кнопка и Инпуты) */
+    .stButton>button {
+        background-color: #3f51b5 !important; /* Глубокий индиго */
+        color: white;
+        border-radius: 12px !important; /* Большее скругление */
+        border: none;
+        padding: 0.6rem 1.5rem;
+        font-weight: 500;
+        width: auto !important; /* Кнопка не на всю ширину */
+    }
+
+    /* Выравнивание высоты блоков */
+    [data-testid="stVerticalBlock"] > div:has(div.stContainer) {
+        height: 100%;
+    }
+    .main-card {
+        min-height: 250px; /* Фиксированная высота для симметрии */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    /* 3. Зона загрузки (Drop-zone) */
+    [data-testid="stFileUploadDropzone"] {
+        border: 2px dashed #3f51b5 !important;
+        background: #0d1117;
+        border-radius: 15px;
+    }
+
+    /* 4. Таблица (Padding и Zebra) */
+    .styled-table {
+        border-collapse: collapse;
+        margin: 25px 0;
+        font-size: 0.9em;
+        width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- БОКОВАЯ ПАНЕЛЬ (SIDEBAR) ---
-with st.sidebar:
-    st.title("📂 InsightCopy AI")
-    page = st.radio("Навигация", ["🏠 Главная", "📈 Аналитика", "ℹ️ О проекте"])
-    st.divider()
-    st.caption("Пользователь: Mary Gitlam")
+
+# --- ФУНКЦИИ ХЕЛПЕРЫ ---
+def color_sentiment(val):
+    """Цветовая индикация тональности для таблицы"""
+    if val == 2 or val == 'Positive':
+        color = '#2e7d32'  # Зеленый
+    elif val == 1 or val == 'Negative':
+        color = '#d32f2f'  # Красный
+    else:
+        color = '#757575'  # Серый
+    return f'background-color: {color}; color: white; border-radius: 4px; padding: 2px 5px;'
+
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if page == "🏠 Главная":
-    st.title("Welcome to InsightCopy AI")
-    st.caption("Агрегируйте, анализируйте и генерируйте контент на основе отзывов покупателей.")
+    st.title("InsightCopy AI")
+    st.markdown("<p style='opacity: 0.7;'>Аналитика маркетплейсов на базе BERT</p>", unsafe_allow_html=True)
 
-    # 1. ЗАГРУЗКА ДАННЫХ ДЛЯ СПРАВОЧНИКА (из предыдущего шага)
+    # Загружаем данные
     product_df = get_all_products()
-    product_options = product_df.apply(lambda x: f"{x['product_name']} ({x['nm_id']})", axis=1).tolist()
+    # UX-редактура: Переименовываем столбцы для пользователя
+    display_df = product_df.rename(columns={
+        'nm_id': 'ID Товара',
+        'product_name': 'Наименование',
+        'category': 'Категория',
+        'sentiment_score': 'Тональность'  # Допустим, у нас есть эта колонка
+    })
 
-    # 2. СОЗДАЕМ ДВЕ КОЛОНКИ ДЛЯ ВВОДА
-    col_input, col_upload = st.columns(2)
+    # ГЛАВНЫЙ РЯД: Поиск и Загрузка
+    col_input, col_upload, col_stats = st.columns([1.5, 1.5, 1])
 
     with col_input:
         with st.container(border=True):
-            st.markdown("### 🔎 МГНОВЕННЫЙ АНАЛИЗ")
-            selected_option = st.selectbox(
-                "Выберите товар из базы:",
-                options=[""] + product_options,
-                index=0,
-                placeholder="Название или артикул...",
-                label_visibility="collapsed"
-            )
+            st.markdown("#### 🔎 Мгновенный анализ")
+            product_options = display_df.apply(lambda x: f"{x['Наименование']} ({x['ID Товара']})", axis=1).tolist()
 
-            if st.button("ПОЛУЧИТЬ АНАЛИТИКУ", type="primary", use_container_width=True):
+            selected_option = st.selectbox(
+                "Выберите товар:",
+                options=[""] + product_options,
+                label_visibility="collapsed",
+                placeholder="Поиск по названию или ID..."
+            )
+            st.write(" ")  # Воздух
+            if st.button("ПОЛУЧИТЬ АНАЛИТИКУ"):
                 if selected_option:
-                    sku = selected_option.split('(')[-1].replace(')', '')
-                    st.session_state.current_sku = sku
+                    st.session_state.current_sku = selected_option.split('(')[-1].replace(')', '')
                 else:
-                    st.warning("Выберите товар")
+                    st.toast("Сначала выберите товар", icon="⚠️")
 
     with col_upload:
         with st.container(border=True):
-            st.markdown("### ⚙️ АНАЛИЗ ВАШИХ ДАННЫХ")
-            uploaded_file = st.file_uploader(
-                "Загрузите свой .xlsx или .csv",
+            st.markdown("#### ⚙️ Ваши данные")
+            st.file_uploader(
+                "Перетащите отчет сюда",
                 type=['csv', 'xlsx'],
                 label_visibility="collapsed"
             )
-            if uploaded_file:
-                st.success("Файл загружен! Настройте обработку BERT.")
+            st.caption("Поддерживаются форматы WB и OZON")
 
-    # 3. БЛОК РЕЗУЛЬТАТОВ (Разворачивается под кнопками)
-    if 'current_sku' in st.session_state:
-        st.divider()
-        sku = st.session_state.current_sku
-        summary = get_summary(sku)
+    with col_stats:
+        with st.container(border=True):
+            st.markdown("#### 📊 Сводка")
+            st.metric("Товаров в базе", len(product_df))
+            st.metric("Точность BERT", "94%")
 
-        if summary:
-            st.markdown(f"### 📊 Результаты для артикула {sku}")
-            res_col1, res_col2 = st.columns([3, 1])
-            with res_col1:
-                st.info(summary)
-            with res_col2:
-                st.metric("Тональность", "Позитивная", "+12%")
-                st.button("Детальный отчет", use_container_width=True)
-        else:
-            st.error("Аналитика для этого товара не найдена.")
+    # БЛОК ОБЗОРА БАЗЫ
+    st.write("---")
+    st.subheader("📦 Мониторинг каталога")
 
-    st.write("")
+    if not display_df.empty:
+        # Применяем стилизацию таблицы (Zebra stripes и Sentiment Visuals)
+        # В Streamlit st.dataframe поддерживает pandas styler
+        styled_df = display_df.head(15).style.applymap(
+            color_sentiment, subset=['Тональность'] if 'Тональность' in display_df.columns else []
+        )
 
-    # 4. БЛОК ОБЗОРА БАЗЫ (Теперь он ниже и помогает понять, что искать)
-    st.markdown("### 📦 Доступно в базе данных")
-    tab1, tab2 = st.tabs(["Все товары", "По категориям"])
-
-    with tab1:
         st.dataframe(
-            product_df[['nm_id', 'product_name', 'category']],
+            styled_df,
             use_container_width=True,
             hide_index=True
         )
-
-    with tab2:
-        cat_counts = product_df['category'].value_counts()
-        st.bar_chart(cat_counts)
-
+    else:
+        # Пустое состояние (Empty State)
+        st.info("🔍 В базе пока нет данных. Загрузите файл или подключите API.")
 
 
 # --- СТРАНИЦА: АНАЛИТИКА ---
