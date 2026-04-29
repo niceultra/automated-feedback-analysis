@@ -55,95 +55,100 @@ def get_all_products():
             'category': ['Электроника', 'Электроника', 'Аксессуары']
         })
 
-# --- КАСТОМНЫЙ CSS (Для стиля как на картинке) ---
+
+# --- СТИЛИЗАЦИЯ ПОД МИНИМАЛИЗМ ---
 st.markdown("""
     <style>
-    /* 1. Навигация и Sidebar */
+    /* Убираем лишние отступы сверху */
+    .block-container { padding-top: 2rem; }
+
+    /* Чистый Sidebar без лишних линий */
     [data-testid="stSidebar"] {
-        min-width: 200px;
-        max-width: 250px;
-        background-color: #161b22; /* Темный оттенок для sidebar */
+        background-color: #111418;
+        border-right: 1px solid #1e2227;
     }
 
-    /* Убираем красные точки и стилизуем активный пункт */
-    .stRadio [data-testid="stWidgetLabel"] { display: none; }
-    div[role="radiogroup"] label {
-        background: transparent;
-        padding: 10px 15px;
-        border-radius: 8px;
-        margin-bottom: 5px;
-        transition: 0.3s;
-    }
-    div[role="radiogroup"] label:hover {
-        background: rgba(255, 255, 255, 0.05);
-    }
-
-    /* 2. Компоненты управления (Кнопка и Инпуты) */
+    /* Кнопка: Минимум цвета, максимум стиля */
     .stButton>button {
-        background-color: #3f51b5 !important; /* Глубокий индиго */
-        color: white;
-        border-radius: 12px !important; /* Большее скругление */
-        border: none;
-        padding: 0.6rem 1.5rem;
-        font-weight: 500;
-        width: auto !important; /* Кнопка не на всю ширину */
-    }
-
-    /* Выравнивание высоты блоков */
-    [data-testid="stVerticalBlock"] > div:has(div.stContainer) {
-        height: 100%;
-    }
-    .main-card {
-        min-height: 250px; /* Фиксированная высота для симметрии */
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-
-    /* 3. Зона загрузки (Drop-zone) */
-    [data-testid="stFileUploadDropzone"] {
-        border: 2px dashed #3f51b5 !important;
-        background: #0d1117;
-        border-radius: 15px;
-    }
-
-    /* 4. Таблица (Padding и Zebra) */
-    .styled-table {
-        border-collapse: collapse;
-        margin: 25px 0;
-        font-size: 0.9em;
         width: 100%;
-        border-radius: 8px;
-        overflow: hidden;
+        background-color: #2e343d !important;
+        color: #ffffff;
+        border: 1px solid #4a505e !important;
+        border-radius: 8px !important;
+        transition: 0.2s;
     }
-    /* Создаем класс для фиксированной высоты карточек */
-    div[data-testid="stVBCell"] > div:has(div.fixed-height) {
-        height: 100%;
+    .stButton>button:hover {
+        border-color: #3f51b5 !important;
+        background-color: #1e2227 !important;
     }
-    
-    .fixed-height {
-        min-height: 220px; /* Настройте эту высоту под себя */
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
+
+    /* Таблица: Делаем её "невидимой" и чистой */
+    [data-testid="stDataFrame"] {
+        border: none !important;
     }
-    
-    /* Убираем лишние отступы внутри контейнеров для точности */
-    .stElementContainer { margin-bottom: 0px; }
+
+    /* Убираем жирные заголовки контейнеров */
+    h3, h4 {
+        font-weight: 400 !important;
+        letter-spacing: -0.02em;
+        opacity: 0.9;
+    }
     </style>
     """, unsafe_allow_html=True)
 
+# --- УПРАВЛЕНИЕ В SIDEBAR (как у профессиональных демо) ---
+with st.sidebar:
+    st.title("InsightCopy")
+    st.caption("v 2.1 — Sentiment Analysis")
 
-# --- ФУНКЦИИ ХЕЛПЕРЫ ---
-def color_sentiment(val):
-    """Цветовая индикация тональности для таблицы"""
-    if val == 2 or val == 'Positive':
-        color = '#2e7d32'  # Зеленый
-    elif val == 1 or val == 'Negative':
-        color = '#d32f2f'  # Красный
-    else:
-        color = '#757575'  # Серый
-    return f'background-color: {color}; color: white; border-radius: 4px; padding: 2px 5px;'
+    st.write("---")
+
+    # ПЕРЕНОСИМ УПРАВЛЕНИЕ СЮДА
+    st.markdown("### Анализ")
+    product_options = display_df.apply(lambda x: f"{x['Наименование']} ({x['ID Товара']})", axis=1).tolist()
+    selected_option = st.selectbox("Выберите артикул из базы:", [""] + product_options)
+
+    if st.button("Запустить анализ"):
+        if selected_option:
+            st.session_state.current_sku = selected_option.split('(')[-1].replace(')', '')
+
+    st.write("---")
+    st.markdown("### Загрузка")
+    st.file_uploader("Загрузить свой отчет", type=['csv', 'xlsx'])
+
+# --- ОСНОВНАЯ ЧИСТАЯ ОБЛАСТЬ ---
+if 'current_sku' not in st.session_state:
+    # Приветственный экран, если ничего не выбрано
+    st.title("Мониторинг каталога")
+
+    # Горизонтальные метрики без рамок
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Всего товаров", len(product_df))
+    m2.metric("Активность", "Высокая")
+    m3.metric("Точность", "94%")
+
+    st.write("---")
+
+    # Чистая таблица
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    # Экран с результатами (только аналитика)
+    sku = st.session_state.current_sku
+    st.title(f"Аналитика: {sku}")
+
+    summary = get_summary(sku)
+    if summary:
+        with st.container():
+            st.markdown(f"<div style='padding: 20px; background: #1a1c23; border-radius: 15px;'>{summary}</div>",
+                        unsafe_allow_html=True)
+
+    if st.button("← Вернуться к списку"):
+        del st.session_state.current_sku
+        st.rerun()
 
 # --- БОКОВАЯ ПАНЕЛЬ (SIDEBAR) ---
 with st.sidebar:
