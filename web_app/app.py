@@ -116,6 +116,20 @@ st.markdown("""
         border-radius: 8px;
         overflow: hidden;
     }
+    /* Создаем класс для фиксированной высоты карточек */
+    div[data-testid="stVBCell"] > div:has(div.fixed-height) {
+        height: 100%;
+    }
+    
+    .fixed-height {
+        min-height: 220px; /* Настройте эту высоту под себя */
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    /* Убираем лишние отступы внутри контейнеров для точности */
+    .stElementContainer { margin-bottom: 0px; }
     </style>
     """, unsafe_allow_html=True)
 
