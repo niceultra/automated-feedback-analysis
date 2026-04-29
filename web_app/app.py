@@ -86,64 +86,68 @@ with st.sidebar:
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if page == "🏠 Главная":
     st.title("Welcome to InsightCopy AI")
-    st.caption("Аналитика тональности и генерация контента на основе отзывов.")
+    st.caption("Агрегируйте, анализируйте и генерируйте контент на основе отзывов покупателей.")
 
-    # 1. ЗАГРУЗКА ДАННЫХ ДЛЯ СПРАВОЧНИКА
+    # 1. ЗАГРУЗКА ДАННЫХ ДЛЯ СПРАВОЧНИКА (из предыдущего шага)
     product_df = get_all_products()
-
-    # Создаем список для поиска в формате "Название (Артикул)"
     product_options = product_df.apply(lambda x: f"{x['product_name']} ({x['nm_id']})", axis=1).tolist()
 
-    # --- БЛОК ПОИСКА ---
-    with st.container(border=True):
-        st.subheader("🔎 Мгновенный анализ")
+    # 2. СОЗДАЕМ ДВЕ КОЛОНКИ ДЛЯ ВВОДА
+    col_input, col_upload = st.columns(2)
 
-        # Вместо обычного ввода — выпадающий список с поиском
-        selected_option = st.selectbox(
-            "Выберите товар из базы или введите название:",
-            options=[""] + product_options,
-            index=0,
-            placeholder="Начните вводить название или артикул..."
-        )
+    with col_input:
+        with st.container(border=True):
+            st.markdown("### 🔎 МГНОВЕННЫЙ АНАЛИЗ")
+            selected_option = st.selectbox(
+                "Выберите товар из базы:",
+                options=[""] + product_options,
+                index=0,
+                placeholder="Название или артикул...",
+                label_visibility="collapsed"
+            )
 
-        if st.button("ПОЛУЧИТЬ АНАЛИТИКУ", type="primary"):
-            if selected_option:
-                # Извлекаем nm_id из строки "Название (12345)"
-                sku = selected_option.split('(')[-1].replace(')', '')
-                st.session_state.current_sku = sku
-            else:
-                st.warning("Сначала выберите товар из списка.")
+            if st.button("ПОЛУЧИТЬ АНАЛИТИКУ", type="primary", use_container_width=True):
+                if selected_option:
+                    sku = selected_option.split('(')[-1].replace(')', '')
+                    st.session_state.current_sku = sku
+                else:
+                    st.warning("Выберите товар")
 
-    # --- БЛОК РЕЗУЛЬТАТОВ (Появляется здесь же!) ---
+    with col_upload:
+        with st.container(border=True):
+            st.markdown("### ⚙️ АНАЛИЗ ВАШИХ ДАННЫХ")
+            uploaded_file = st.file_uploader(
+                "Загрузите свой .xlsx или .csv",
+                type=['csv', 'xlsx'],
+                label_visibility="collapsed"
+            )
+            if uploaded_file:
+                st.success("Файл загружен! Настройте обработку BERT.")
+
+    # 3. БЛОК РЕЗУЛЬТАТОВ (Разворачивается под кнопками)
     if 'current_sku' in st.session_state:
         st.divider()
         sku = st.session_state.current_sku
-
-        # Получаем данные (те же функции, что были в Аналитике)
         summary = get_summary(sku)
 
         if summary:
-            col_a, col_b = st.columns([2, 1])
-            with col_a:
-                st.markdown(f"### 📊 Результаты для артикула {sku}")
+            st.markdown(f"### 📊 Результаты для артикула {sku}")
+            res_col1, res_col2 = st.columns([3, 1])
+            with res_col1:
                 st.info(summary)
-            with col_b:
-                st.markdown("### 📈 Метрики")
+            with res_col2:
                 st.metric("Тональность", "Позитивная", "+12%")
-                if st.button("Открыть детальный отчет"):
-                    st.switch_page("страница_аналитики.py")  # Если нужно уйти в детали
+                st.button("Детальный отчет", use_container_width=True)
         else:
-            st.error("Аналитика для этого товара еще не готова.")
+            st.error("Аналитика для этого товара не найдена.")
 
     st.write("")
 
-    # --- БЛОК ОБЗОРА БАЗЫ ---
+    # 4. БЛОК ОБЗОРА БАЗЫ (Теперь он ниже и помогает понять, что искать)
     st.markdown("### 📦 Доступно в базе данных")
-
     tab1, tab2 = st.tabs(["Все товары", "По категориям"])
 
     with tab1:
-        # Показываем таблицу, чтобы пользователь понимал масштаб
         st.dataframe(
             product_df[['nm_id', 'product_name', 'category']],
             use_container_width=True,
@@ -151,10 +155,9 @@ if page == "🏠 Главная":
         )
 
     with tab2:
-        # Группировка для понимания структуры
         cat_counts = product_df['category'].value_counts()
         st.bar_chart(cat_counts)
-        st.write(f"Всего категорий: **{len(cat_counts)}**")
+
 
 
 # --- СТРАНИЦА: АНАЛИТИКА ---
