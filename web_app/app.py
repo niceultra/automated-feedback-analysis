@@ -196,7 +196,7 @@ if page == "🏠 Главная":
     if not display_df.empty:
         # Применяем стилизацию таблицы (Zebra stripes и Sentiment Visuals)
         # В Streamlit st.dataframe поддерживает pandas styler
-        styled_df = display_df.head(15).style.applymap(
+        styled_df = display_df.head(15).style.map(
             color_sentiment, subset=['Тональность'] if 'Тональность' in display_df.columns else []
         )
 
