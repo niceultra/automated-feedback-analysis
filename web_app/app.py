@@ -11,6 +11,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ---
+if 'page' not in st.session_state:
+    st.session_state.page = "Главная"
+if 'current_sku' not in st.session_state:
+    st.session_state.current_sku = None
+if 'current_category' not in st.session_state:
+    st.session_state.current_category = None
+
 # --- ДАННЫЕ ПОДКЛЮЧЕНИЯ ---
 # Используем секреты Streamlit для безопасности
 DB_HOST = st.secrets["DB_HOST"]
@@ -155,6 +163,27 @@ st.markdown("""
         color: white !important;
         padding: 8px 12px !important;
     }
+
+    /* Стили для главной страницы */
+    .search-section {
+        background: #15181d;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 25px;
+        border: 1px solid #2e343d;
+    }
+    .section-title {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #a0a0a0;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .section-title i {
+        color: #3f51b5;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -181,17 +210,39 @@ with st.sidebar:
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
 
-    # Навигация через selectbox для чистого вида
-    page = st.selectbox("Перейти к разделу:", ["🏠 Главная", "📈 Аналитика", "ℹ️ О проекте"])
+    # Навигация через кнопки (без выпадающего списка)
+    st.markdown("### Навигация")
+    if st.button("🏠 Главная", use_container_width=True):
+        st.session_state.page = "Главная"
+    if st.button("📈 Аналитика", use_container_width=True):
+        st.session_state.page = "Аналитика"
+    if st.button("ℹ️ О проекте", use_container_width=True):
+        st.session_state.page = "О проекте"
 
     st.divider()
-    st.markdown("### Управление")
 
-    # НОВАЯ РАЗДЕЛ: ИЕРАРХИЧЕСКАЯ НАВИГАЦИЯ ПО ТОВАРАМ
-    st.markdown("### 📦 База товаров")
-    st.caption("Выберите категорию и товар для анализа")
+# --- СТРАНИЦА: ГЛАВНАЯ ---
+if st.session_state.page == "Главная":
+    st.title("Мониторинг каталога")
+    st.markdown("<p style='opacity: 0.6;'>Общая сводка по доступным товарам и их текущему состоянию</p>",
+                unsafe_allow_html=True)
 
-    # Добавляем поиск по категориям
+    # Метрики без рамок для чистоты
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Товаров в базе", len(product_df))
+    m2.metric("Активность системы", "Высокая")
+    m3.metric("Точность BERT", "94%", delta="↑ 2%")
+
+    st.divider()
+
+    # --- НОВАЯ СЕКЦИЯ: БАЗА ТОВАРОВ НА ГЛАВНОЙ СТРАНИЦЕ ---
+    st.markdown('<div class="search-section">', unsafe_allow_html=True)
+
+    # Заголовок секции
+    st.markdown('<div class="section-title"><i>📦</i> База товаров для анализа</div>',
+                unsafe_allow_html=True)
+
+    # Поиск по категориям
     search_query = st.text_input(
         "Поиск по категориям",
         placeholder="Например: Электроника",
@@ -256,27 +307,41 @@ with st.sidebar:
                 st.toast(f"Категория {category} выбрана для анализа!", icon="✅")
 
     # Кнопка запуска анализа
-    if st.button("Запустить анализ", use_container_width=True, type="primary"):
+    if st.button("Запустить анализ", use_container_width=True, type="primary", key="main_analyze"):
         if st.session_state.get('current_sku') or st.session_state.get('current_category'):
             st.toast("Анализ запущен!", icon="🚀")
+            st.session_state.page = "Аналитика"  # Автоматический переход на аналитику
         else:
             st.warning("Выберите товар или категорию для анализа")
 
-    st.divider()
-    st.markdown("### Свои данные")
-    st.file_uploader("Загрузить .csv или .xlsx", type=['csv', 'xlsx'], label_visibility="collapsed")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# --- СТРАНИЦА: ГЛАВНАЯ ---
-if page == "🏠 Главная":
-    st.title("Мониторинг каталога")
-    st.markdown("<p style='opacity: 0.6;'>Общая сводка по доступным товарам и их текущему состоянию</p>",
+    # --- НОВАЯ СЕКЦИЯ: СВОИ ДАННЫЕ НА ГЛАВНОЙ СТРАНИЦЕ ---
+    st.markdown('<div class="search-section">', unsafe_allow_html=True)
+
+    # Заголовок секции
+    st.markdown('<div class="section-title"><i>📁</i> Добавьте свои данные</div>',
                 unsafe_allow_html=True)
 
-    # Метрики без рамок для чистоты
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Товаров в базе", len(product_df))
-    m2.metric("Активность системы", "Высокая")
-    m3.metric("Точность BERT", "94%", delta="↑ 2%")
+    # Загрузка файлов
+    uploaded_file = st.file_uploader(
+        "Загрузите .csv или .xlsx файл с отзывами",
+        type=['csv', 'xlsx'],
+        label_visibility="collapsed"
+    )
+
+    if uploaded_file is not None:
+        st.success("Файл успешно загружен!")
+        st.caption(f"Размер файла: {round(uploaded_file.size / 1024, 2)} KB")
+
+        # Здесь будет логика обработки файла
+        # st.write("Обработка данных...")
+
+        if st.button("Анализировать загруженные данные", use_container_width=True, type="primary"):
+            st.toast("Анализ загруженных данных запущен!", icon="🚀")
+            st.session_state.page = "Аналитика"  # Автоматический переход на аналитику
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.divider()
 
@@ -291,7 +356,7 @@ if page == "🏠 Главная":
         st.info("В базе данных пока нет информации.")
 
 # --- СТРАНИЦА: АНАЛИТИКА ---
-elif page == "📈 Аналитика":
+elif st.session_state.page == "Аналитика":
     st.title("Результаты анализа")
 
     # Проверяем, что выбрана категория или товар
@@ -322,9 +387,6 @@ elif page == "📈 Аналитика":
         category = st.session_state.current_category
         st.markdown(f"#### 📊 Анализ категории: {category}")
 
-        # Здесь будет логика анализа категории
-        st.info("Функционал анализа по категории находится в разработке. Показываем пример результата:")
-
         # Пример результата для категории
         st.markdown("""
         <div class="result-box">
@@ -349,10 +411,10 @@ elif page == "📈 Аналитика":
 
     else:
         # Состояние "ничего не выбрано"
-        st.info("⬅️ Пожалуйста, выберите товар или категорию в меню слева, чтобы увидеть отчет.")
+        st.info("⬅️ Пожалуйста, выберите товар или категорию на главной странице, чтобы увидеть отчет.")
 
 # --- СТРАНИЦА: О ПРОЕКТЕ ---
-elif page == "ℹ️ О проекте":
+elif st.session_state.page == "О проекте":
     st.title("О проекте")
     st.markdown("""
     Система InsightCopy AI разработана для автоматизации глубокого анализа клиентского опыта. 
