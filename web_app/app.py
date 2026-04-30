@@ -235,6 +235,7 @@ if st.session_state.page == "Главная":
 
     st.divider()
 
+    # --- НОВАЯ СЕКЦИЯ: БАЗА ТОВАРОВ НА ГЛАВНОЙ СТРАНИЦЕ ---
 
 
     # Заголовок секции
@@ -316,7 +317,7 @@ if st.session_state.page == "Главная":
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- НОВАЯ СЕКЦИЯ: СВОИ ДАННЫЕ НА ГЛАВНОЙ СТРАНИЦЕ ---
-    st.markdown('<div class="search-section">', unsafe_allow_html=True)
+
 
     # Заголовок секции
     st.markdown('<div class="section-title"><i>📁</i> Добавьте свои данные</div>',
