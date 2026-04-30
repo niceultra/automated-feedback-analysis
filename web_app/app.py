@@ -110,6 +110,51 @@ st.markdown("""
 
     /* Скрытие стандартных радио-кнопок для чистоты */
     .stRadio [data-testid="stWidgetLabel"] { display: none; }
+
+    /* Улучшаем мобильную адаптацию для категорий */
+    .category-expander {
+        background: #1e2227 !important;
+        border-radius: 10px !important;
+        border: 1px solid #2e343d !important;
+        margin-bottom: 10px !important;
+    }
+    .category-header {
+        font-weight: 600 !important;
+        color: #a0a0a0 !important;
+        padding: 10px !important;
+    }
+    .category-items {
+        padding: 10px !important;
+        background: #15181d !important;
+        border-radius: 8px !important;
+    }
+    .category-item {
+        padding: 8px 12px !important;
+        border-radius: 6px !important;
+        margin: 5px 0 !important;
+        cursor: pointer !important;
+        transition: all 0.2s !important;
+        border: 1px solid #2e343d !important;
+    }
+    .category-item:hover {
+        background: #2e343d !important;
+        border-color: #3f51b5 !important;
+    }
+    .category-item-selected {
+        background: #3f51b5 !important;
+        border-color: #3f51b5 !important;
+        color: white !important;
+    }
+    .category-search {
+        margin-top: 15px !important;
+    }
+    .category-search input {
+        background: #1e2227 !important;
+        border: 1px solid #2e343d !important;
+        border-radius: 8px !important;
+        color: white !important;
+        padding: 8px 12px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -142,16 +187,80 @@ with st.sidebar:
     st.divider()
     st.markdown("### Управление")
 
-    # Выбор товара из базы
-    options = display_df.apply(lambda x: f"{x['Наименование']} ({x['ID Товара']})", axis=1).tolist()
-    selected_item = st.selectbox("Выберите артикул из базы:", [""] + options)
+    # НОВАЯ РАЗДЕЛ: ИЕРАРХИЧЕСКАЯ НАВИГАЦИЯ ПО ТОВАРАМ
+    st.markdown("### 📦 База товаров")
+    st.caption("Выберите категорию и товар для анализа")
 
-    if st.button("Запустить анализ"):
-        if selected_item:
-            # Сохраняем артикул в сессию, чтобы он был доступен на вкладке Аналитика
-            sku = selected_item.split('(')[-1].replace(')', '')
-            st.session_state.current_sku = sku
-            st.toast(f"Артикул {sku} выбран!", icon="✅")
+    # Добавляем поиск по категориям
+    search_query = st.text_input(
+        "Поиск по категориям",
+        placeholder="Например: Электроника",
+        label_visibility="collapsed"
+    )
+
+    # Группируем товары по категориям
+    categories = product_df['category'].unique()
+
+    # Фильтруем категории по запросу
+    if search_query:
+        filtered_categories = [cat for cat in categories if search_query.lower() in cat.lower()]
+    else:
+        filtered_categories = categories
+
+    # Если нет результатов поиска
+    if len(filtered_categories) == 0 and search_query:
+        st.info("Категории не найдены")
+
+    # Создаем раскрывающиеся списки для категорий
+    for category in filtered_categories:
+        # Используем expander для категории
+        with st.expander(f"📦 {category}", expanded=False):
+            # Получаем товары в категории
+            category_products = product_df[product_df['category'] == category]
+
+            # Показываем количество товаров
+            st.markdown(f"<div class='category-header'>{len(category_products)} товаров</div>",
+                        unsafe_allow_html=True)
+
+            # Создаем кнопки для каждого товара
+            for idx, row in category_products.iterrows():
+                # Создаем уникальный ключ для каждой кнопки
+                btn_key = f"prod_{row['nm_id']}"
+
+                # Проверяем, выбран ли текущий товар
+                is_selected = st.session_state.get('current_sku') == row['nm_id']
+
+                # Стилизуем кнопку в зависимости от состояния
+                btn_style = "category-item-selected" if is_selected else "category-item"
+
+                # Создаем кнопку товара
+                if st.button(
+                        f"▫️ {row['product_name']} ({row['nm_id']})",
+                        key=btn_key,
+                        use_container_width=True,
+                        type="secondary" if not is_selected else "primary"
+                ):
+                    st.session_state.current_sku = row['nm_id']
+                    st.session_state.current_category = category
+                    st.toast(f"Товар {row['product_name']} выбран!", icon="✅")
+
+            # Кнопка для анализа всей категории
+            if st.button(
+                    f"🔍 Проанализировать всю категорию",
+                    key=f"cat_analyze_{category}",
+                    use_container_width=True,
+                    type="secondary"
+            ):
+                st.session_state.current_category = category
+                st.session_state.current_sku = None  # Сбрасываем выбор товара
+                st.toast(f"Категория {category} выбрана для анализа!", icon="✅")
+
+    # Кнопка запуска анализа
+    if st.button("Запустить анализ", use_container_width=True, type="primary"):
+        if st.session_state.get('current_sku') or st.session_state.get('current_category'):
+            st.toast("Анализ запущен!", icon="🚀")
+        else:
+            st.warning("Выберите товар или категорию для анализа")
 
     st.divider()
     st.markdown("### Свои данные")
@@ -185,10 +294,10 @@ if page == "🏠 Главная":
 elif page == "📈 Аналитика":
     st.title("Результаты анализа")
 
-    # Пытаемся получить SKU из сессии (если пользователь нажал кнопку на главной или в сайдбаре)
-    current_sku = st.session_state.get('current_sku')
-
-    if current_sku:
+    # Проверяем, что выбрана категория или товар
+    if st.session_state.get('current_sku'):
+        # Анализ для конкретного товара
+        current_sku = st.session_state.current_sku
         summary = get_summary(current_sku)
 
         if summary:
@@ -207,9 +316,40 @@ elif page == "📈 Аналитика":
                     st.write("Тексты отзывов для этого артикула не найдены.")
         else:
             st.warning(f"Аналитика для артикула {current_sku} еще не сформирована.")
+
+    elif st.session_state.get('current_category'):
+        # Анализ для всей категории
+        category = st.session_state.current_category
+        st.markdown(f"#### 📊 Анализ категории: {category}")
+
+        # Здесь будет логика анализа категории
+        st.info("Функционал анализа по категории находится в разработке. Показываем пример результата:")
+
+        # Пример результата для категории
+        st.markdown("""
+        <div class="result-box">
+        <b>Основные инсайты по категории "Электроника":</b><br>
+        • 78% положительных отзывов<br>
+        • Основные преимущества: "отличная камера", "быстрая зарядка"<br>
+        • Основные недостатки: "низкое качество звука", "перегрев"<br>
+        • Рекомендация: улучшить аудиосистему в следующих моделях
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.write("")
+        st.subheader("Товары в категории")
+        category_products = product_df[product_df['category'] == category]
+        if not category_products.empty:
+            category_display = category_products[['nm_id', 'product_name']].rename(
+                columns={'nm_id': 'ID Товара', 'product_name': 'Наименование'}
+            )
+            st.dataframe(category_display, use_container_width=True)
+        else:
+            st.info("В этой категории нет товаров")
+
     else:
         # Состояние "ничего не выбрано"
-        st.info("⬅️ Пожалуйста, выберите товар в меню слева, чтобы увидеть отчет.")
+        st.info("⬅️ Пожалуйста, выберите товар или категорию в меню слева, чтобы увидеть отчет.")
 
 # --- СТРАНИЦА: О ПРОЕКТЕ ---
 elif page == "ℹ️ О проекте":
