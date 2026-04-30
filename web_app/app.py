@@ -76,12 +76,71 @@ st.markdown("""
     /* Общие настройки шрифтов и отступов */
     .block-container { padding-top: 2rem; }
 
-    /* Адаптивные стили для сайдбара */
-    [data-testid="stSidebar"] {
-        background-color: var(--sidebar-background-color);
-        border-right: 1px solid var(--border-color);
-    }
+    /* Исправленный CSS для сайдбара */
+[data-testid="stSidebar"] {
+    background-color: #0d1117 !important;  /* Более темный цвет, как в примере */
+    border-right: 1px solid #21262d !important;  /* Более контрастная граница */
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+}
 
+/* Улучшение структуры сайдбара */
+[data-testid="stSidebar"] .sidebar-content {
+    background-color: #0d1117 !important;
+}
+
+/* Заголовок сайдбара */
+[data-testid="stSidebar"] h1 {
+    color: #ffffff !important;
+    font-size: 1.5rem !important;
+    margin-bottom: 0.5rem !important;
+    padding-left: 1.5rem !important;
+}
+
+/* Разделители в сайдбаре */
+[data-testid="stSidebar"] hr {
+    border-top: 1px solid #21262d !important;
+    margin: 1rem 0 !important;
+}
+
+/* Кнопки навигации в сайдбаре */
+[data-testid="stSidebar"] .stButton>button {
+    width: 100% !important;
+    background-color: #161b22 !important;
+    color: #c9d1d9 !important;
+    border: 1px solid #30363d !important;
+    border-radius: 6px !important;
+    padding: 0.75rem 1.5rem !important;
+    margin: 0.25rem 1.5rem !important;
+    transition: 0.3s !important;
+    text-align: left !important;
+}
+
+/* Активная кнопка навигации */
+[data-testid="stSidebar"] .stButton>button[data-testid="baseButton-primary"] {
+    background-color: #1f262d !important;
+    border-color: #3f51b5 !important;
+    color: #ffffff !important;
+    font-weight: 600 !important;
+}
+
+/* Поддержка разных тем */
+[data-theme="light"] [data-testid="stSidebar"] {
+    background-color: #f8f9fa !important;
+    border-right: 1px solid #eaecef !important;
+}
+
+[data-theme="light"] [data-testid="stSidebar"] .stButton>button {
+    background-color: #ffffff !important;
+    color: #24292f !important;
+    border: 1px solid #eaecef !important;
+}
+
+[data-theme="light"] [data-testid="stSidebar"] .stButton>button[data-testid="baseButton-primary"] {
+    background-color: #f0f6fc !important;
+    border-color: #3f51b5 !important;
+    color: #24292f !important;
+}
     /* Адаптивные стили для основного контента */
     .main {
         background-color: var(--background-color);
