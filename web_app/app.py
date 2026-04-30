@@ -70,70 +70,91 @@ def get_all_products():
         })
 
 
-# --- КАСТОМНЫЙ CSS (Минимализм и чистые линии) ---
+# --- КАСТОМНЫЙ CSS (Адаптивная тема) ---
 st.markdown("""
     <style>
     /* Общие настройки шрифтов и отступов */
     .block-container { padding-top: 2rem; }
 
-    /* Чистый Sidebar */
+    /* Адаптивные стили для сайдбара */
     [data-testid="stSidebar"] {
-        background-color: #111418;
-        border-right: 1px solid #1e2227;
+        background-color: var(--sidebar-background-color);
+        border-right: 1px solid var(--border-color);
     }
 
-    /* Кнопки: Акцент на стиле, а не на цвете */
+    /* Адаптивные стили для основного контента */
+    .main {
+        background-color: var(--background-color);
+        color: var(--text-color);
+    }
+
+    /* Кнопки: адаптивные стили */
     .stButton>button {
         width: 100%;
-        background-color: #2e343d !important;
-        color: #ffffff;
-        border: 1px solid #4a505e !important;
+        background-color: var(--secondary-background-color) !important;
+        color: var(--text-color) !important;
+        border: 1px solid var(--border-color) !important;
         border-radius: 8px !important;
         padding: 0.5rem 1rem;
         transition: 0.3s;
     }
     .stButton>button:hover {
-        border-color: #3f51b5 !important;
-        background-color: #1e2227 !important;
+        border-color: var(--primary-color) !important;
+        background-color: var(--tertiary-background-color) !important;
     }
 
     /* Зона загрузки файлов */
     [data-testid="stFileUploadDropzone"] {
-        border: 1px dashed #4a505e !important;
-        background: #0d1117;
+        border: 1px dashed var(--border-color) !important;
+        background: var(--background-color);
         border-radius: 10px;
     }
 
-    /* Таблица: Убираем визуальный шум */
-    [data-testid="stDataFrame"] { border: none !important; }
+    /* Таблица: адаптивные стили */
+    [data-testid="stDataFrame"] {
+        border: none !important;
+        background-color: var(--background-color);
+        color: var(--text-color);
+    }
+
+    [data-testid="stDataFrame"] th {
+        background-color: var(--secondary-background-color);
+        color: var(--text-color);
+        font-weight: 600;
+    }
+
+    [data-testid="stDataFrame"] td {
+        border-top: 1px solid var(--border-color);
+    }
 
     /* Стилизация текста результатов */
     .result-box {
-        background: #1a1c23; 
+        background: var(--secondary-background-color); 
         padding: 25px; 
         border-radius: 15px; 
-        border-left: 5px solid #3f51b5;
+        border-left: 5px solid var(--primary-color);
         line-height: 1.6;
+        color: var(--text-color);
     }
 
     /* Скрытие стандартных радио-кнопок для чистоты */
     .stRadio [data-testid="stWidgetLabel"] { display: none; }
 
-    /* Улучшаем мобильную адаптацию для категорий */
+    /* Адаптивные стили для категорий */
     .category-expander {
-        background: #1e2227 !important;
+        background: var(--secondary-background-color) !important;
         border-radius: 10px !important;
-        border: 1px solid #2e343d !important;
+        border: 1px solid var(--border-color) !important;
         margin-bottom: 10px !important;
     }
     .category-header {
         font-weight: 600 !important;
-        color: #a0a0a0 !important;
+        color: var(--text-color) !important;
         padding: 10px !important;
     }
     .category-items {
         padding: 10px !important;
-        background: #15181d !important;
+        background: var(--background-color) !important;
         border-radius: 8px !important;
     }
     .category-item {
@@ -142,47 +163,107 @@ st.markdown("""
         margin: 5px 0 !important;
         cursor: pointer !important;
         transition: all 0.2s !important;
-        border: 1px solid #2e343d !important;
+        border: 1px solid var(--border-color) !important;
     }
     .category-item:hover {
-        background: #2e343d !important;
-        border-color: #3f51b5 !important;
+        background: var(--tertiary-background-color) !important;
+        border-color: var(--primary-color) !important;
     }
     .category-item-selected {
-        background: #3f51b5 !important;
-        border-color: #3f51b5 !important;
+        background: var(--primary-color) !important;
+        border-color: var(--primary-color) !important;
         color: white !important;
     }
     .category-search {
         margin-top: 15px !important;
     }
     .category-search input {
-        background: #1e2227 !important;
-        border: 1px solid #2e343d !important;
+        background: var(--background-color) !important;
+        border: 1px solid var(--border-color) !important;
         border-radius: 8px !important;
-        color: white !important;
+        color: var(--text-color) !important;
         padding: 8px 12px !important;
+    }
+
+    /* Стили для метрик */
+    .metric-card {
+        background: var(--secondary-background-color);
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .metric-value {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: var(--text-color);
+        margin: 0.5rem 0;
+    }
+
+    .metric-label {
+        color: var(--text-color-secondary);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .metric-change {
+        display: inline-block;
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        background: var(--tertiary-background-color);
+        color: var(--text-color-secondary);
     }
 
     /* Стили для главной страницы */
     .search-section {
-        background: #15181d;
+        background: var(--secondary-background-color);
         border-radius: 15px;
         padding: 20px;
         margin-bottom: 25px;
-        border: 1px solid #2e343d;
+        border: 1px solid var(--border-color);
     }
     .section-title {
         font-size: 1.2rem;
         font-weight: 600;
-        color: #a0a0a0;
+        color: var(--text-color);
         margin-bottom: 15px;
         display: flex;
         align-items: center;
         gap: 10px;
     }
     .section-title i {
-        color: #3f51b5;
+        color: var(--primary-color);
+    }
+
+    /* Адаптивные стили для заголовков */
+    h1, h2, h3, h4 {
+        color: var(--text-color) !important;
+    }
+
+    p {
+        color: var(--text-color-secondary) !important;
+    }
+
+    /* Адаптивные стили для отчетов */
+    .report-section {
+        background: var(--secondary-background-color);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border-color);
+    }
+
+    .report-title {
+        color: var(--text-color);
+        font-size: 1.3rem;
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+
+    .report-content {
+        color: var(--text-color);
+        line-height: 1.6;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -190,10 +271,26 @@ st.markdown("""
 
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
-    if val == 2 or val == 'Positive': return 'color: #4caf50; font-weight: bold;'
-    if val == 1 or val == 'Negative': return 'color: #f44336; font-weight: bold;'
-    return 'color: #9e9e9e;'
+    if val == 2 or val == 'Positive':
+        return 'color: var(--positive-color); font-weight: bold;'
+    if val == 1 or val == 'Negative':
+        return 'color: var(--negative-color); font-weight: bold;'
+    return 'color: var(--text-color-secondary);'
 
+
+# Добавим кастомные переменные для тональности
+st.markdown("""
+<style>
+    :root {
+        --positive-color: #4CAF50;
+        --negative-color: #F44336;
+    }
+    [data-theme="light"] {
+        --positive-color: #2E7D32;
+        --negative-color: #C62828;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # --- ПОДГОТОВКА ДАННЫХ ---
 product_df = get_all_products()
@@ -236,7 +333,7 @@ if st.session_state.page == "Главная":
     st.divider()
 
     # --- НОВАЯ СЕКЦИЯ: БАЗА ТОВАРОВ НА ГЛАВНОЙ СТРАНИЦЕ ---
-
+    st.markdown('<div class="search-section">', unsafe_allow_html=True)
 
     # Заголовок секции
     st.markdown('<div class="section-title"><i>📦</i> База товаров для анализа</div>',
@@ -317,7 +414,7 @@ if st.session_state.page == "Главная":
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- НОВАЯ СЕКЦИЯ: СВОИ ДАННЫЕ НА ГЛАВНОЙ СТРАНИЦЕ ---
-
+    st.markdown('<div class="search-section">', unsafe_allow_html=True)
 
     # Заголовок секции
     st.markdown('<div class="section-title"><i>📁</i> Добавьте свои данные</div>',
