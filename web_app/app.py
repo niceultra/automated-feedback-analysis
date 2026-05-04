@@ -23,7 +23,7 @@ local_css("style.css")
 # 1. Настройка страницы
 st.set_page_config(
     page_title="InsightCopy AI",
-    page_icon="📊",
+    page_icon="./images/logo.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
