@@ -54,7 +54,7 @@
     }
     /* Убираем центрирование для всего приложения и прижимаем к левому краю */
     .main .block-container {
-        max-width: 1200px; /* Общий лимит ширины, чтобы текст не растягивался в бесконечность */
+
         margin-left: 0 !important;
         margin-right: auto !important;
         padding-left: 5rem; /* Добавляем элегантный отступ слева */
@@ -64,14 +64,14 @@
     div[data-testid="stExpander"],
     div[data-testid="stTextInput"],
     div.stAlert {
-        max-width: 700px !important; /* Делаем блок компактным */
+
         margin-left: 0 !important;
         margin-right: auto !important;
     }
 
     /* Подправляем заголовок секции, чтобы он тоже был в лимитированной ширине */
     .section-title {
-        max-width: 700px;
+
         justify-content: flex-start;
     }
 
@@ -84,7 +84,7 @@
         background-color: #28a745 !important; /* Насыщенный зеленый */
         border: none !important;
         transition: background-color 0.3s ease !important;
-        max-width: 700px;
+
     }
     /* Эффект при наведении для интерактивности */
     div.stButton > button[kind="primary"]:hover {
@@ -100,13 +100,13 @@
 
     /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
     div[data-testid="stExpander"] {
-        max-width: 800px;
+
         margin: 0 auto;
     }
 
     /* Ограничение ширины поля поиска */
     div[data-testid="stTextInput"] {
-        max-width: 800px;
+
         margin: 0 auto;
     }
 
