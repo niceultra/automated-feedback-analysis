@@ -116,7 +116,8 @@ st.markdown("""
     div.stButton > button[kind="primary"] {
         display: flex !important;
         justify-content: center !important; /* Оставил центр для акцента, но в рамках 700px */
-        font-weight: 600 !important;
+    
+        max-width: 700px;
     }
     
 
