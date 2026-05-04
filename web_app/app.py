@@ -19,10 +19,15 @@ def local_css(file_name):
         st.error(f"Файл {file_name} не найден по пути: {file_path}")
 
 local_css("style.css")
-# 1. Настройка страницы
+
+
+# 1. Открываем изображение с помощью PIL
+img = Image.open("./images/logo.png")
+
+# 2. Передаем объект изображения в конфигурацию
 st.set_page_config(
     page_title="InsightCopy AI",
-    page_icon="./images/logo.png",
+    page_icon=img,
     layout="wide",
     initial_sidebar_state="expanded"
 )
