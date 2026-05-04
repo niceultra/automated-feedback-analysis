@@ -118,7 +118,7 @@ with st.sidebar:
         # Текст заголовка без эмодзи
         st.markdown(
             """
-            <h1 style='margin: 0; padding: 0;'>
+            <h1 style='margin-top: 10px; margin-bottom: 0; padding: 0;'>
                 Insight<span style='color: #28a745;'>Bot</span>
             </h1>
             """,
