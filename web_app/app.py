@@ -117,6 +117,8 @@ st.markdown("""
         display: flex !important;
         justify-content: center !important; /* Оставил центр для акцента, но в рамках 700px */
         background-color: #6c5ce7 !important; /* Насыщенный фиолетовый */
+        border: none !important;
+        transition: background-color 0.3s ease !important;
         max-width: 700px;
     }
     
