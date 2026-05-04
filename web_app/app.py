@@ -173,7 +173,7 @@ if st.session_state.page == "Главная":
             categories = [cat for cat in categories if search_query.lower() in cat.lower()]
 
         for category in categories:
-            with st.expander(f"📦 {category}", expanded=False):
+            with st.expander(f"{category}", expanded=False):
                 cat_prods = product_df[product_df['category_name'] == category]
                 for _, row in cat_prods.iterrows():
                     # Проверяем, выбран ли этот товар сейчас
