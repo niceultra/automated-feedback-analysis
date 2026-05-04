@@ -189,6 +189,31 @@ st.markdown("""
         align-items: center;
         gap: 10px;
     }
+    /* 1. Стилизация кнопок в сайдбаре под пункты меню */
+    section[data-testid="stSidebar"] div.stButton > button {
+        background-color: transparent !important;
+        border: none !important;
+        color: #ffffff !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        padding: 10px 15px !important;
+        font-weight: 400 !important;
+        transition: all 0.2s ease;
+        border-radius: 10px !important; /* Скругление как на картинке */
+    }
+
+    /* 2. Эффект при наведении (легкий фон) */
+    section[data-testid="stSidebar"] div.stButton > button:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+    }
+
+    /* 3. СТИЛЬ ДЛЯ АКТИВНОГО ПУНКТА (выделяем программно) */
+    /* Мы будем добавлять спец. ключ в коде, чтобы подсветить нужную кнопку */
+    div.stButton > button[key^="active_nav"] {
+        background-color: #3d4655 !important; /* Серый фон как на скрине */
+        font-weight: 600 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
