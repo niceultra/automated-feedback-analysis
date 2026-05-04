@@ -18,7 +18,6 @@ def local_css(file_name):
     else:
         st.error(f"Файл {file_name} не найден по пути: {file_path}")
 
-
 local_css("style.css")
 # 1. Настройка страницы
 st.set_page_config(
