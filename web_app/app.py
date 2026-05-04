@@ -193,12 +193,9 @@ st.markdown("""
     section[data-testid="stSidebar"] div.stButton > button {
         background-color: transparent !important;
         border: none !important;
-        color: #ffffff !important;
         text-align: left !important;
         justify-content: flex-start !important;
         width: 100% !important;
-        padding: 10px 15px !important;
-        font-weight: 400 !important;
         transition: all 0.2s ease;
         border-radius: 10px !important; /* Скругление как на картинке */
     }
