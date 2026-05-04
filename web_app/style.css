@@ -38,18 +38,10 @@
     color: #ffffff !important;
 }
 
-/* Фиолетовая кнопка аналитики */
-div.stButton > button[kind="primary"] {
-    background-color: #6c5ce7 !important;
-    border: none !important;
-    width: 100% !important;
-    border-radius: 6px !important;
-}
 
 
-# --- КАСТОМНЫЙ CSS ---
-st.markdown("""
-    <style>
+
+
     .block-container { padding-top: 2rem; }
 
     .result-box {
