@@ -116,7 +116,14 @@ with st.sidebar:
 
     with col2:
         # Текст заголовка без эмодзи
-        st.title("Insight Бот")
+        st.markdown(
+            """
+            <h1 style='margin: 0; padding: 0;'>
+                Insight<span style='color: #28a745;'>Bot</span>
+            </h1>
+            """,
+            unsafe_allow_html=True
+        )
 
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
