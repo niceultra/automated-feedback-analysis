@@ -178,7 +178,7 @@ if st.session_state.page == "Главная":
                 for _, row in cat_prods.iterrows():
                     # Проверяем, выбран ли этот товар сейчас
                     is_active = st.session_state.current_sku == row['nm_id']
-                    button_label = f"✓ {row['product_name']}" if is_active else f"▫️ {row['product_name']}"
+                    button_label = f"✓  {row['product_name']}" if is_active else f"{row['product_name']}"
 
                     if st.button(button_label, key=f"btn_{row['nm_id']}", use_container_width=True):
                         st.session_state.current_sku = row['nm_id']
