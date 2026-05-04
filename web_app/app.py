@@ -116,7 +116,7 @@ st.markdown("""
     div.stButton > button[kind="primary"] {
         display: flex !important;
         justify-content: center !important; /* Оставил центр для акцента, но в рамках 700px */
-    
+        background-color: #6c5ce7 !important; /* Насыщенный фиолетовый */
         max-width: 700px;
     }
     
