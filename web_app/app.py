@@ -129,11 +129,13 @@ with st.sidebar:
     st.divider()
 
     st.markdown("### Навигация")
-    if st.button("🏠 Главная", use_container_width=True):
+    if st.button("Главная", icon=":material/home:", use_container_width=True):
         st.session_state.page = "Главная"
-    if st.button("📈 Аналитика", use_container_width=True):
+
+    if st.button("Аналитика", icon=":material/monitoring:", use_container_width=True):
         st.session_state.page = "Аналитика"
-    if st.button("ℹ️ О проекте", use_container_width=True):
+
+    if st.button("О проекте", icon=":material/info:", use_container_width=True):
         st.session_state.page = "О проекте"
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
