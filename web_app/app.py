@@ -28,6 +28,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ---
+if 'page' not in st.session_state:
+    st.session_state.page = "Главная"
+if 'current_sku' not in st.session_state:
+    st.session_state.current_sku = None
+if 'current_category' not in st.session_state:
+    st.session_state.current_category = None
 
 # --- ДАННЫЕ ПОДКЛЮЧЕНИЯ ---
 DB_HOST = st.secrets["DB_HOST"]
