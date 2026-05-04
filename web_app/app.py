@@ -131,6 +131,7 @@ if st.session_state.page == "Главная":
     st.title("Мониторинг каталога")
     st.markdown("<p style='opacity: 0.6;'>Аналитическая точность и инсайты вашего бренда</p>", unsafe_allow_html=True)
 
+    # Метрики (оставляем как есть)
     m1, m2, m3 = st.columns(3)
     m1.metric("Товаров в базе", len(product_df))
     m2.metric("Активность системы", "Высокая")
@@ -142,7 +143,6 @@ if st.session_state.page == "Главная":
 
     search_query = st.text_input("Поиск по категориям", placeholder="Например: Красота", label_visibility="collapsed")
 
-    # Группировка по категориям из новой таблицы
     if not product_df.empty:
         categories = product_df['category_name'].unique()
         if search_query:
@@ -152,11 +152,27 @@ if st.session_state.page == "Главная":
             with st.expander(f"📦 {category}", expanded=False):
                 cat_prods = product_df[product_df['category_name'] == category]
                 for _, row in cat_prods.iterrows():
-                    if st.button(f"▫️ {row['product_name']} (ID: {row['nm_id']})", key=f"btn_{row['nm_id']}",
-                                 use_container_width=True):
+                    # Проверяем, выбран ли этот товар сейчас
+                    is_active = st.session_state.current_sku == row['nm_id']
+                    button_label = f"✅ {row['product_name']}" if is_active else f"▫️ {row['product_name']}"
+
+                    if st.button(button_label, key=f"btn_{row['nm_id']}", use_container_width=True):
                         st.session_state.current_sku = row['nm_id']
                         st.session_state.current_category = category
-                        st.toast(f"Выбран: {row['product_name']}", icon="✅")
+                        st.rerun()  # Перезапускаем, чтобы показать кнопку перехода
+
+    # --- УЛУЧШЕНИЕ: КНОПКА ПЕРЕХОДА К АНАЛИТИКЕ ---
+    if st.session_state.current_sku:
+        st.write("")  # Отступ
+        # Находим имя выбранного товара для красоты
+        selected_name = product_df[product_df['nm_id'] == st.session_state.current_sku]['product_name'].values[0]
+
+        st.info(f"Выбран товар: **{selected_name}**")
+
+        # Большая кнопка перехода
+        if st.button("🚀 Перейти к детальной аналитике", type="primary", use_container_width=True):
+            st.session_state.page = "Аналитика"
+            st.rerun()
 
     st.divider()
 
