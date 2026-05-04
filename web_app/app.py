@@ -110,11 +110,15 @@ st.markdown("""
         justify-content: flex-start;
     }
     
-    /* Делаем разделитель (st.divider) тоже коротким под ширину блока */
-    hr {
-        max-width: 700px;
-        margin-left: 0 !important;
+    /* Специально для кнопки "Перейти к аналитике" (primary): 
+       делаем её текст тоже выровненным по левому краю, если хочешь полного единства,
+       или оставляем по центру для акцента (но ширина теперь будет 700px) */
+    div.stButton > button[kind="primary"] {
+        display: flex !important;
+        justify-content: center !important; /* Оставил центр для акцента, но в рамках 700px */
+        font-weight: 600 !important;
     }
+    
 
     /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
     div[data-testid="stExpander"] {
