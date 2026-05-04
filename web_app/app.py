@@ -23,7 +23,6 @@ local_css("style.css")
 
 # 1. Открываем изображение с помощью PIL
 img = Image.open("./images/logo.png")
-
 # 2. Передаем объект изображения в конфигурацию
 st.set_page_config(
     page_title="InsightCopy AI",
