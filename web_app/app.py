@@ -88,32 +88,40 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* 1. Общие стили для кнопок (не меняем выравнивание для всех) */
-    div.stButton > button {
-        border-radius: 8px;
-    }
-
-    /* 2. ТАРГЕТНОЕ ВЫРАВНИВАНИЕ: только для кнопок внутри экспандеров (товаров) */
-    div[data-testid="stExpander"] div.stButton > button {
+    /* 1. Находим кнопки только внутри экспандеров */
+    div[data-testid="stExpander"] button {
         display: flex !important;
         justify-content: flex-start !important;
         text-align: left !important;
         width: 100% !important;
-        padding-left: 15px !important;
     }
 
-    /* Исправляем внутренний контейнер текста для кнопок в экспандерах */
-    div[data-testid="stExpander"] div.stButton > button div[data-testid="stMarkdownContainer"] p {
+    /* 2. ТАРГЕТНЫЙ ХАК: выравниваем внутренний контейнер, который Streamlit центрирует по умолчанию */
+    div[data-testid="stExpander"] button > div[data-testid="baseButton-secondary"],
+    div[data-testid="stExpander"] button > div {
+        display: flex !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
         text-align: left !important;
     }
 
-    /* 3. Кнопки навигации и действия ( sidebar и основные) остаются по центру автоматически,
-       так как они не попадают под селектор stExpander */
+    /* 3. Гарантируем, что текст (параграф) внутри тоже прижат влево */
+    div[data-testid="stExpander"] button p {
+        text-align: left !important;
+        justify-content: flex-start !important;
+        margin-bottom: 0 !important;
+    }
+
+    /* 4. Оставляем основную кнопку (Аналитика) и кнопки меню по центру */
+    /* Мы их не трогаем, так как они не внутри div[data-testid="stExpander"] */
     
-    /* Добавим немного стиля для активной кнопки перехода (primary) */
-    button[data-testid="baseButton-primary"] {
-        box-shadow: 0 4px 12px rgba(63, 81, 181, 0.3);
-        margin-top: 10px;
+    .result-box {
+        padding: 25px;
+        border-radius: 15px;
+        background-color: #1a1c23;
+        border-left: 5px solid #3f51b5;
+        line-height: 1.6;
+        margin-bottom: 20px;
     }
     }
     .section-title {
