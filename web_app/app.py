@@ -4,13 +4,21 @@ import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
 
+
 def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    # Получаем абсолютный путь к директории, где лежит сам скрипт
+    parent_dir = os.path.dirname(os.path.abspath(__file__))
+    # Соединяем путь с именем файла
+    file_path = os.path.join(parent_dir, file_name)
 
-# Вызываем функцию в самом начале отрисовки интерфейса
+    if os.path.exists(file_path):
+        with open(file_path, encoding="utf-8") as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    else:
+        st.error(f"Файл {file_name} не найден по пути: {file_path}")
+
+
 local_css("style.css")
-
 # 1. Настройка страницы
 st.set_page_config(
     page_title="InsightCopy AI",
