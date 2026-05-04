@@ -88,9 +88,13 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Ультимативное выравнивание текста в кнопках по левому краю */
-    button[data-testid="baseButton-secondary"], 
-    button[data-testid="baseButton-primary"] {
+    /* 1. Общие стили для кнопок (не меняем выравнивание для всех) */
+    div.stButton > button {
+        border-radius: 8px;
+    }
+
+    /* 2. ТАРГЕТНОЕ ВЫРАВНИВАНИЕ: только для кнопок внутри экспандеров (товаров) */
+    div[data-testid="stExpander"] div.stButton > button {
         display: flex !important;
         justify-content: flex-start !important;
         text-align: left !important;
@@ -98,18 +102,18 @@ st.markdown("""
         padding-left: 15px !important;
     }
 
-    /* Выравнивание вложенного текстового контейнера внутри кнопки */
-    button[data-testid="baseButton-secondary"] div[data-testid="stMarkdownContainer"] p,
-    button[data-testid="baseButton-primary"] div[data-testid="stMarkdownContainer"] p {
+    /* Исправляем внутренний контейнер текста для кнопок в экспандерах */
+    div[data-testid="stExpander"] div.stButton > button div[data-testid="stMarkdownContainer"] p {
         text-align: left !important;
-        margin-left: 0 !important;
     }
 
-    /* Дополнительный хак для иконок и текста */
-    div.stButton > button > div {
-        display: flex !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
+    /* 3. Кнопки навигации и действия ( sidebar и основные) остаются по центру автоматически,
+       так как они не попадают под селектор stExpander */
+    
+    /* Добавим немного стиля для активной кнопки перехода (primary) */
+    button[data-testid="baseButton-primary"] {
+        box-shadow: 0 4px 12px rgba(63, 81, 181, 0.3);
+        margin-top: 10px;
     }
     }
     .section-title {
