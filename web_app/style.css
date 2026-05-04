@@ -129,7 +129,7 @@
 
 /* Добавляем фиолетовый фон для сайдбара, совместимый с обеими темами */
 [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #6c5ce7 0%, #5145cd 100%) !important;
+    background: linear-gradient(180deg, #7d5fff 0%, #6c5ce7 100%) !important;
 }
 
 /* Улучшаем видимость текста в сайдбаре */
@@ -154,7 +154,7 @@
 
 /* Специальные стили для темной темы (улучшение контраста) */
 .stApp.stAppDark [data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #7d5fff 0%, #6c5ce7 100%) !important;
+
 }
 
 /* Улучшаем вид активного пункта меню в темной теме */
