@@ -88,13 +88,29 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* НАШЕ ИСПРАВЛЕНИЕ ДЛЯ КНОПОК */
-    div.stButton > button {
-        display: flex;
-        justify-content: flex-start;
-        text-align: left;
-        padding-left: 15px;
-        width: 100%;
+    /* Ультимативное выравнивание текста в кнопках по левому краю */
+    button[data-testid="baseButton-secondary"], 
+    button[data-testid="baseButton-primary"] {
+        display: flex !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        width: 100% !important;
+        padding-left: 15px !important;
+    }
+
+    /* Выравнивание вложенного текстового контейнера внутри кнопки */
+    button[data-testid="baseButton-secondary"] div[data-testid="stMarkdownContainer"] p,
+    button[data-testid="baseButton-primary"] div[data-testid="stMarkdownContainer"] p {
+        text-align: left !important;
+        margin-left: 0 !important;
+    }
+
+    /* Дополнительный хак для иконок и текста */
+    div.stButton > button > div {
+        display: flex !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+    }
     }
     .section-title {
         font-size: 1.2rem;
