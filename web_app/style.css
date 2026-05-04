@@ -127,24 +127,19 @@
         margin-bottom: 0 !important;
     }
 
-/* Добавляем фиолетовый фон для сайдбара, совместимый с обеими темами */
+/* Применяем фиолетовый градиент ко всему сайдбару независимо от темы */
 [data-testid="stSidebar"] {
     background: linear-gradient(180deg, #7d5fff 0%, #6c5ce7 100%) !important;
 }
 
-/* Улучшаем видимость текста в сайдбаре */
+/* Сохраняем текущий стиль текста из темной темы для обеих тем */
 [data-testid="stSidebar"] .st-emotion-cache-1629p82,
 [data-testid="stSidebar"] .st-emotion-cache-1v0mbdj,
 [data-testid="stSidebar"] .st-emotion-cache-10oheav {
     color: rgba(255, 255, 255, 0.9) !important;
 }
 
-/* Делаем разделитель более светлым для лучшей видимости */
-[data-testid="stSidebar"] hr {
-    border-color: rgba(255, 255, 255, 0.2) !important;
-}
-
-/* Улучшаем контраст для заголовков в сайдбаре */
+/* Заголовки в сайдбаре */
 [data-testid="stSidebar"] h1,
 [data-testid="stSidebar"] h2,
 [data-testid="stSidebar"] h3 {
@@ -152,12 +147,22 @@
     text-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
 
-/* Специальные стили для темной темы (улучшение контраста) */
+/* Разделительная линия */
+[data-testid="stSidebar"] hr {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Удаляем специфичные для темной темы стили */
 .stApp.stAppDark [data-testid="stSidebar"] {
-
+    background: linear-gradient(180deg, #7d5fff 0%, #6c5ce7 100%) !important;
 }
 
-/* Улучшаем вид активного пункта меню в темной теме */
-.stApp.stAppDark [data-testid="stSidebar"] div.stButton > button[key*="active"] {
+/* Сохраняем стиль активного пункта меню */
+[data-testid="stSidebar"] div.stButton > button[key*="active"] {
     background-color: rgba(255, 255, 255, 0.15) !important;
+    color: white !important;
+    font-weight: 500 !important;
+    border-left: 3px solid #f8f9fa !important;
+    padding-left: 0.85rem !important;
 }
+
