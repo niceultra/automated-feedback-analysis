@@ -9,6 +9,7 @@ DB_NAME = st.secrets["DB_NAME"]
 DB_USER = st.secrets["DB_USER"]
 DB_PASS = st.secrets["DB_PASS"]
 
+
 # --- ФУНКЦИИ БАЗЫ ДАННЫХ ---
 def get_db_connection():
     return psycopg2.connect(

@@ -73,6 +73,7 @@ if st.session_state.get('current_sku'):
                 st.dataframe(styled_reviews, use_container_width=True)
             else:
                 st.info("Отзывы не найдены.")
+
     else:
         st.warning(f"Аналитика для артикула {current_sku} находится в обработке.")
 else:
