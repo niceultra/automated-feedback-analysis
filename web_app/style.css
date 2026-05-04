@@ -14,6 +14,13 @@
     transition: background-color 0.15s ease-in-out;
 }
 
+[data-testid="stSidebar"] div.stButton > button:hover {
+    background-color: rgba(200, 200, 200, 0.15) !important;
+}
+.stApp.stAppDark [data-testid="stSidebar"] div.stButton > button:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: #ffffff !important;
+}
 
 /* Активный пункт меню */
 [data-testid="stSidebar"] div.stButton > button[key*="active"] {
