@@ -128,7 +128,6 @@ with st.sidebar:
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
 
-    st.markdown("### Навигация")
     if st.button("Главная", icon=":material/home:", use_container_width=True):
         st.session_state.page = "Главная"
 
@@ -140,18 +139,18 @@ with st.sidebar:
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
-    st.title("Мониторинг каталога")
-    st.markdown("<p style='opacity: 0.6;'>Аналитическая точность и инсайты вашего бренда</p>", unsafe_allow_html=True)
+    st.title("Интеллектуальный мониторинг отзывов и настроений покупателей")
+    st.markdown("<p style='opacity: 0.6;'>Автоматически собираем отзывы с маркетплейсов и определяем какие есть потребности у потребителей с помощью нейросетей</p>", unsafe_allow_html=True)
 
     # Метрики (оставляем как есть)
     m1, m2, m3 = st.columns(3)
-    m1.metric("Товаров в базе", len(product_df))
-    m2.metric("Активность системы", "Высокая")
-    m3.metric("Точность BERT", "94%", delta="↑ 2%")
+    m1.metric("Позиций в базе", len(product_df))
+    m2.metric("Активность системы", "Данные постоянно обновляются")
+    m3.metric("Точность модели", "94%", delta="↑ 2%")
 
     st.divider()
 
-    st.markdown('<div class="section-title">📦 База товаров для анализа</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Выберите категорию или артикул товара, чтобы увидеть подробную аналитику пользовательских мнений</div>', unsafe_allow_html=True)
 
     search_query = st.text_input("Поиск по категориям", placeholder="Например: Красота", label_visibility="collapsed")
 
