@@ -1,0 +1,48 @@
+/* style.css */
+
+/* Навигация как в Bootstrap */
+[data-testid="stSidebar"] {
+    background-color: #1a1c23;
+}
+
+[data-testid="stSidebar"] div.stButton > button {
+    background-color: transparent !important;
+    color: #adb5bd !important;
+    border: none !important;
+    text-align: left !important;
+    padding: 0.5rem 1rem !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    border-radius: 6px !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    font-size: 14px;
+    transition: background-color 0.15s ease-in-out;
+}
+
+[data-testid="stSidebar"] div.stButton > button:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: #ffffff !important;
+}
+
+/* Активный пункт меню */
+[data-testid="stSidebar"] div.stButton > button[key*="active"] {
+    background-color: #3d4655 !important;
+    color: #ffffff !important;
+    font-weight: 500 !important;
+}
+
+[data-testid="stSidebar"] div.stButton > button:focus:not(:active) {
+    box-shadow: none !important;
+    color: #ffffff !important;
+}
+
+/* Фиолетовая кнопка аналитики */
+div.stButton > button[kind="primary"] {
+    background-color: #6c5ce7 !important;
+    color: white !important;
+    border: none !important;
+    width: 100% !important;
+    border-radius: 6px !important;
+}

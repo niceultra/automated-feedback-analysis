@@ -4,6 +4,13 @@ import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
 
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Вызываем функцию в самом начале отрисовки интерфейса
+local_css("style.css")
+
 # 1. Настройка страницы
 st.set_page_config(
     page_title="InsightCopy AI",
@@ -73,147 +80,6 @@ def get_all_products():
         return df
     except:
         return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
-
-# --- КАСТОМНЫЙ CSS ---
-st.markdown("""
-    <style>
-    .block-container { padding-top: 2rem; }
-
-    .result-box {
-        padding: 25px;
-        border-radius: 15px;
-        background-color: #1a1c23;
-        border-left: 5px solid #3f51b5;
-        line-height: 1.6;
-        margin-bottom: 20px;
-    }
-    /* Убираем центрирование для всего приложения и прижимаем к левому краю */
-    .main .block-container {
-        max-width: 1200px; /* Общий лимит ширины, чтобы текст не растягивался в бесконечность */
-        margin-left: 0 !important;
-        margin-right: auto !important;
-        padding-left: 5rem; /* Добавляем элегантный отступ слева */
-    }
-
-    /* Ограничиваем ширину конкретно блоков выбора товаров и поиска */
-    div[data-testid="stExpander"], 
-    div[data-testid="stTextInput"],
-    div.stAlert {
-        max-width: 700px !important; /* Делаем блок компактным */
-        margin-left: 0 !important;
-        margin-right: auto !important;
-    }
-
-    /* Подправляем заголовок секции, чтобы он тоже был в лимитированной ширине */
-    .section-title {
-        max-width: 700px;
-        justify-content: flex-start;
-    }
-    
-    /* Специально для кнопки "Перейти к аналитике" (primary): 
-       делаем её текст тоже выровненным по левому краю, если хочешь полного единства,
-       или оставляем по центру для акцента (но ширина теперь будет 700px) */
-    div.stButton > button[kind="primary"] {
-        display: flex !important;
-        justify-content: center !important; /* Оставил центр для акцента, но в рамках 700px */
-        background-color: #6c5ce7 !important; /* Насыщенный фиолетовый */
-        border: none !important;
-        transition: background-color 0.3s ease !important;
-        max-width: 700px;
-    }
-    /* Эффект при наведении для интерактивности */
-    div.stButton > button[kind="primary"]:hover {
-        background-color: #a29bfe !important; /* Светло-фиолетовый при ховере */
-        border: none !important;
-    }
-
-    /* Эффект при нажатии */
-    div.stButton > button[kind="primary"]:active {
-        background-color: #4834d4 !important;
-    }
-    
-
-    /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
-    div[data-testid="stExpander"] {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    
-    /* Ограничение ширины поля поиска */
-    div[data-testid="stTextInput"] {
-        max-width: 800px;
-        margin: 0 auto;
-    }
-
-    /* 1. Находим кнопки только внутри экспандеров */
-    div[data-testid="stExpander"] button {
-        display: flex !important;
-        justify-content: flex-start !important;
-        text-align: left !important;
-        width: 100% !important;
-    }
-
-    /* 2. ТАРГЕТНЫЙ ХАК: выравниваем внутренний контейнер, который Streamlit центрирует по умолчанию */
-    div[data-testid="stExpander"] button > div[data-testid="baseButton-secondary"],
-    div[data-testid="stExpander"] button > div {
-        display: flex !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-        text-align: left !important;
-    }
-
-    /* 3. Гарантируем, что текст (параграф) внутри тоже прижат влево */
-    div[data-testid="stExpander"] button p {
-        text-align: left !important;
-        justify-content: flex-start !important;
-        margin-bottom: 0 !important;
-    }
-
-    /* 4. Оставляем основную кнопку (Аналитика) и кнопки меню по центру */
-    /* Мы их не трогаем, так как они не внутри div[data-testid="stExpander"] */
-    
-    .result-box {
-        padding: 25px;
-        border-radius: 15px;
-        background-color: #1a1c23;
-        border-left: 5px solid #3f51b5;
-        line-height: 1.6;
-        margin-bottom: 20px;
-    }
-    }
-    .section-title {
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    /* 1. Стилизация кнопок в сайдбаре под пункты меню */
-    section[data-testid="stSidebar"] div.stButton > button {
-        background-color: transparent !important;
-        border: none !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-        transition: all 0.2s ease;
-        border-radius: 10px !important; /* Скругление как на картинке */
-    }
-
-    /* 2. Эффект при наведении (легкий фон) */
-    section[data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-    }
-
-    /* 3. СТИЛЬ ДЛЯ АКТИВНОГО ПУНКТА (выделяем программно) */
-    /* Мы будем добавлять спец. ключ в коде, чтобы подсветить нужную кнопку */
-    div.stButton > button[key^="active_nav"] {
-        background-color: #3d4655 !important; /* Серый фон как на скрине */
-        font-weight: 600 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
