@@ -87,6 +87,23 @@ st.markdown("""
         line-height: 1.6;
         margin-bottom: 20px;
     }
+    /* Это сделает интерфейс более собранным (как в "it-girl" эстетике) */
+    .main .block-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
+    div[data-testid="stExpander"] {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+    
+    /* Ограничение ширины поля поиска */
+    div[data-testid="stTextInput"] {
+        max-width: 800px;
+        margin: 0 auto;
+    }
 
     /* 1. Находим кнопки только внутри экспандеров */
     div[data-testid="stExpander"] button {
