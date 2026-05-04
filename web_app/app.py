@@ -144,13 +144,13 @@ if st.session_state.page == "Главная":
 
     # Метрики (оставляем как есть)
     m1, m2, m3 = st.columns(3)
-    m1.metric("Позиций в базе", len(product_df))
-    m2.metric("Активность системы", "Данные постоянно обновляются")
+    m1.metric("Позиций в базе", f'len(product_df)')
+    m2.metric("Активность системы", "Высокая")
     m3.metric("Точность модели", "94%", delta="↑ 2%")
 
     st.divider()
 
-    st.markdown('<div class="section-title">Выберите категорию или артикул товара, чтобы увидеть подробную аналитику пользовательских мнений</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Выберите категорию или артикул товара, чтобы увидеть аналитику </div>', unsafe_allow_html=True)
 
     search_query = st.text_input("Поиск по категориям", placeholder="Например: Красота", label_visibility="collapsed")
 
