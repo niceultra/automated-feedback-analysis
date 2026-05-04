@@ -121,6 +121,16 @@ st.markdown("""
         transition: background-color 0.3s ease !important;
         max-width: 700px;
     }
+    /* Эффект при наведении для интерактивности */
+    div.stButton > button[kind="primary"]:hover {
+        background-color: #a29bfe !important; /* Светло-фиолетовый при ховере */
+        border: none !important;
+    }
+
+    /* Эффект при нажатии */
+    div.stButton > button[kind="primary"]:active {
+        background-color: #4834d4 !important;
+    }
     
 
     /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
