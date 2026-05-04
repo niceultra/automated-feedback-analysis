@@ -125,7 +125,7 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    st.caption("Sentiment Analysis Dashboard")
+    st.caption("Умная аналитика отзывов")
     st.divider()
 
     if st.button("Главная", icon=":material/home:", use_container_width=True):
@@ -150,8 +150,21 @@ if st.session_state.page == "Главная":
 
     st.divider()
 
-    st.markdown('<div class="section-title">Выберите категорию или артикул товара, чтобы увидеть аналитику </div>', unsafe_allow_html=True)
-
+    st.markdown(
+        """
+        <style>
+        .custom-text {
+            font-style: italic;
+            color: #707070; /* Светло-серый цвет */
+            margin-bottom: 20px; /* Отступ снизу */
+        }
+        </style>
+        <div class="custom-text">
+            Выберите категорию или артикул товара, чтобы увидеть аналитику
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     search_query = st.text_input("Поиск по категориям", placeholder="Например: Красота", label_visibility="collapsed")
 
     if not product_df.empty:
@@ -165,7 +178,8 @@ if st.session_state.page == "Главная":
                 for _, row in cat_prods.iterrows():
                     # Проверяем, выбран ли этот товар сейчас
                     is_active = st.session_state.current_sku == row['nm_id']
-                    button_label = f"✅ {row['product_name']}" if is_active else f"▫️ {row['product_name']}"
+                    icon_name = ":material/check_circle:" if is_active else ":material/radio_button_unchecked:"
+                    button_label = row['product_name']
 
                     if st.button(button_label, key=f"btn_{row['nm_id']}", use_container_width=True):
                         st.session_state.current_sku = row['nm_id']
