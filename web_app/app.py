@@ -203,7 +203,7 @@ if st.session_state.page == "Главная":
 
     # --- ПРАВАЯ КОЛОНКА: ЗАГРУЗКА ФАЙЛОВ ---
     with col_upload:
-        st.markdown("###Загрузка данных")
+        st.markdown("### Загрузка данных")
         uploaded_files = st.file_uploader(
             "Перетащите файл с отзывами сюда, чтобы проанализировать с помощью нейросети",
             type=["csv", "xlsx"],
