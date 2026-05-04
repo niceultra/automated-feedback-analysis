@@ -116,7 +116,7 @@ with st.sidebar:
 
     with col2:
         # Текст заголовка без эмодзи
-        st.title("InsightCopy AI")
+        st.title("Insight Бот")
 
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
