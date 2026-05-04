@@ -25,7 +25,7 @@ local_css("style.css")
 img = Image.open("./images/logo.png")
 # 2. Передаем объект изображения в конфигурацию
 st.set_page_config(
-    page_title="InsightBot - Интеллектуальный мониторинг отзывов и настроений покупателей",
+    page_title="InsightBot-Интеллектуальный мониторинг отзывов и настроений покупателей",
     page_icon=img,
     layout="wide",
     initial_sidebar_state="expanded"
