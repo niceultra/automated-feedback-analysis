@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import psycopg2
+import streamlit.components.v1 as components
 from PIL import Image
 
 # 1. Настройка страницы
@@ -20,7 +21,6 @@ if 'current_category' not in st.session_state:
     st.session_state.current_category = None
 
 # --- ДАННЫЕ ПОДКЛЮЧЕНИЯ ---
-# Используем секреты Streamlit для безопасности
 DB_HOST = st.secrets["DB_HOST"]
 DB_NAME = st.secrets["DB_NAME"]
 DB_USER = st.secrets["DB_USER"]
@@ -28,25 +28,36 @@ DB_PASS = st.secrets["DB_PASS"]
 
 
 # --- ФУНКЦИИ БАЗЫ ДАННЫХ ---
-def get_summary(nm_id):
+def get_db_connection():
+    return psycopg2.connect(
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
+        port=6432,
+        sslmode='require'
+    )
+
+
+def get_product_analytics(nm_id):
+    """Получает и текст резюме, и HTML-код графика"""
     try:
-        conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS, port=6432,
-                                sslmode='require')
+        conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT summary_text FROM product_summary WHERE nm_id = %s", (nm_id,))
+        cursor.execute("SELECT summary_text, chart_html FROM product_summary WHERE nm_id = %s", (str(nm_id),))
         result = cursor.fetchone()
         conn.close()
-        return result[0] if result else None
+        return result if result else (None, None)
     except:
-        return None
+        return None, None
 
 
 def get_reviews(nm_id):
     try:
-        conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS, port=6432,
-                                sslmode='require')
-        # Оборачиваем nm_id в кавычки на случай, если это строка
-        df = pd.read_sql(f"SELECT review_text FROM reviews WHERE nm_id = '{nm_id}'", conn)
+        conn = get_db_connection()
+        # Выбираем текст, тональность и уверенность модели
+        query = f"SELECT review_text, sentiment, confidence FROM reviews WHERE nm_id = '{nm_id}'"
+        df = pd.read_sql(query, conn)
         conn.close()
         return df
     except:
@@ -55,38 +66,27 @@ def get_reviews(nm_id):
 
 def get_all_products():
     try:
-        conn = psycopg2.connect(host=DB_HOST, database=DB_NAME, user=DB_USER, password=DB_PASS, port=6432,
-                                sslmode='require')
-        df = pd.read_sql("SELECT nm_id, category, product_name FROM product_catalog", conn)
+        conn = get_db_connection()
+        # Используем обновленные названия колонок: category_name
+        df = pd.read_sql("SELECT nm_id, category_name, product_name, product_url FROM products", conn)
         conn.close()
         return df
     except:
-        # Заглушка для теста, если база недоступна
-        return pd.DataFrame({
-            'nm_id': ['287657449', '3642034', '933351429'],
-            'product_name': ['Смартфон X1', 'Наушники Pro', 'Чехол Silicone'],
-            'category': ['Электроника', 'Электроника', 'Аксессуары'],
-            'sentiment_score': [2, 0, 1]
-        })
+        return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
 
 
-# --- КАСТОМНЫЙ CSS (Минимальные настройки) ---
+# --- КАСТОМНЫЙ CSS ---
 st.markdown("""
     <style>
-    /* Минимальные стили как в примере */
-    .block-container {
-        padding-top: 2rem;
-        padding-left: 2rem;
-        padding-right: 2rem;
-    }
-
+    .block-container { padding-top: 2rem; }
     .result-box {
         padding: 25px;
         border-radius: 15px;
+        background-color: #1a1c23;
         border-left: 5px solid #3f51b5;
         line-height: 1.6;
+        margin-bottom: 20px;
     }
-
     .section-title {
         font-size: 1.2rem;
         font-weight: 600;
@@ -95,12 +95,15 @@ st.markdown("""
         align-items: center;
         gap: 10px;
     }
+    /* Стилизация метрик для чистого вида */
+    [data-testid="stMetricValue"] { font-size: 1.8rem; }
     </style>
     """, unsafe_allow_html=True)
 
 
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
+    # Соответствие согласно Ledger: 1-neg, 2-pos, 0-neutral
     if val == 2 or val == 'Positive': return 'color: #4caf50; font-weight: bold;'
     if val == 1 or val == 'Negative': return 'color: #f44336; font-weight: bold;'
     return 'color: #9e9e9e;'
@@ -108,12 +111,6 @@ def color_sentiment(val):
 
 # --- ПОДГОТОВКА ДАННЫХ ---
 product_df = get_all_products()
-display_df = product_df.rename(columns={
-    'nm_id': 'ID Товара',
-    'product_name': 'Наименование',
-    'category': 'Категория',
-    'sentiment_score': 'Тональность'
-})
 
 # --- БОКОВАЯ ПАНЕЛЬ (SIDEBAR) ---
 with st.sidebar:
@@ -121,7 +118,6 @@ with st.sidebar:
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
 
-    # Навигация через кнопки
     st.markdown("### Навигация")
     if st.button("🏠 Главная", use_container_width=True):
         st.session_state.page = "Главная"
@@ -133,10 +129,8 @@ with st.sidebar:
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
     st.title("Мониторинг каталога")
-    st.markdown("<p style='opacity: 0.6;'>Общая сводка по доступным товарам и их текущему состоянию</p>",
-                unsafe_allow_html=True)
+    st.markdown("<p style='opacity: 0.6;'>Аналитическая точность и инсайты вашего бренда</p>", unsafe_allow_html=True)
 
-    # Метрики
     m1, m2, m3 = st.columns(3)
     m1.metric("Товаров в базе", len(product_df))
     m2.metric("Активность системы", "Высокая")
@@ -144,182 +138,81 @@ if st.session_state.page == "Главная":
 
     st.divider()
 
-    # --- НОВАЯ СЕКЦИЯ: БАЗА ТОВАРОВ НА ГЛАВНОЙ СТРАНИЦЕ ---
-    st.markdown('<div class="section-title">📦 База товаров для анализа</div>',
-                unsafe_allow_html=True)
+    st.markdown('<div class="section-title">📦 База товаров для анализа</div>', unsafe_allow_html=True)
 
-    # Поиск по категориям
-    search_query = st.text_input(
-        "Поиск по категориям",
-        placeholder="Например: Электроника",
-        label_visibility="collapsed"
-    )
+    search_query = st.text_input("Поиск по категориям", placeholder="Например: Красота", label_visibility="collapsed")
 
-    # Группируем товары по категориям
-    categories = product_df['category'].unique()
+    # Группировка по категориям из новой таблицы
+    if not product_df.empty:
+        categories = product_df['category_name'].unique()
+        if search_query:
+            categories = [cat for cat in categories if search_query.lower() in cat.lower()]
 
-    # Фильтруем категории по запросу
-    if search_query:
-        filtered_categories = [cat for cat in categories if search_query.lower() in cat.lower()]
-    else:
-        filtered_categories = categories
-
-    # Если нет результатов поиска
-    if len(filtered_categories) == 0 and search_query:
-        st.info("Категории не найдены")
-
-    # Создаем раскрывающиеся списки для категорий
-    for category in filtered_categories:
-        # Используем expander для категории
-        with st.expander(f"📦 {category}", expanded=False):
-            # Получаем товары в категории
-            category_products = product_df[product_df['category'] == category]
-
-            # Показываем количество товаров
-            st.markdown(f"**{len(category_products)} товаров**")
-
-            # Создаем кнопки для каждого товара
-            for idx, row in category_products.iterrows():
-                # Создаем уникальный ключ для каждой кнопки
-                btn_key = f"prod_{row['nm_id']}"
-
-                # Проверяем, выбран ли текущий товар
-                is_selected = st.session_state.get('current_sku') == row['nm_id']
-
-                # Создаем кнопку товара
-                if st.button(
-                        f"▫️ {row['product_name']} ({row['nm_id']})",
-                        key=btn_key,
-                        use_container_width=True
-                ):
-                    st.session_state.current_sku = row['nm_id']
-                    st.session_state.current_category = category
-                    st.toast(f"Товар {row['product_name']} выбран!", icon="✅")
-
-            # Кнопка для анализа всей категории
-            if st.button(
-                    f"🔍 Проанализировать всю категорию",
-                    key=f"cat_analyze_{category}",
-                    use_container_width=True
-            ):
-                st.session_state.current_category = category
-                st.session_state.current_sku = None  # Сбрасываем выбор товара
-                st.toast(f"Категория {category} выбрана для анализа!", icon="✅")
-
-    # Кнопка запуска анализа
-    if st.button("Запустить анализ", use_container_width=True, type="primary", key="main_analyze"):
-        if st.session_state.get('current_sku') or st.session_state.get('current_category'):
-            st.toast("Анализ запущен!", icon="🚀")
-            st.session_state.page = "Аналитика"  # Автоматический переход на аналитику
-        else:
-            st.warning("Выберите товар или категорию для анализа")
-
-    # --- НОВАЯ СЕКЦИЯ: СВОИ ДАННЫЕ НА ГЛАВНОЙ СТРАНИЦЕ ---
-    st.markdown('<div class="section-title">📁 Добавьте свои данные</div>',
-                unsafe_allow_html=True)
-
-    # Загрузка файлов
-    uploaded_file = st.file_uploader(
-        "Загрузите .csv или .xlsx файл с отзывами",
-        type=['csv', 'xlsx'],
-        label_visibility="collapsed"
-    )
-
-    if uploaded_file is not None:
-        st.success("Файл успешно загружен!")
-        st.caption(f"Размер файла: {round(uploaded_file.size / 1024, 2)} KB")
-
-        # Здесь будет логика обработки файла
-        # st.write("Обработка данных...")
-
-        if st.button("Анализировать загруженные данные", use_container_width=True, type="primary"):
-            st.toast("Анализ загруженных данных запущен!", icon="🚀")
-            st.session_state.page = "Аналитика"  # Автоматический переход на аналитику
+        for category in categories:
+            with st.expander(f"📦 {category}", expanded=False):
+                cat_prods = product_df[product_df['category_name'] == category]
+                for _, row in cat_prods.iterrows():
+                    if st.button(f"▫️ {row['product_name']} (ID: {row['nm_id']})", key=f"btn_{row['nm_id']}",
+                                 use_container_width=True):
+                        st.session_state.current_sku = row['nm_id']
+                        st.session_state.current_category = category
+                        st.toast(f"Выбран: {row['product_name']}", icon="✅")
 
     st.divider()
 
-    # Чистая таблица с товарами
-    st.subheader("📦 База артикулов")
-    if not display_df.empty:
-        # Применяем цветовой маппинг к колонке Тональность, если она есть
-        target_col = ['Тональность'] if 'Тональность' in display_df.columns else []
-        styled_df = display_df.style.map(color_sentiment, subset=target_col)
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
-    else:
-        st.info("В базе данных пока нет информации.")
+    # Таблица каталога
+    st.subheader("Полный список артикулов")
+    if not product_df.empty:
+        display_list = product_df[['nm_id', 'product_name', 'category_name']].rename(
+            columns={'nm_id': 'ID', 'product_name': 'Наименование', 'category_name': 'Категория'}
+        )
+        st.dataframe(display_list, use_container_width=True, hide_index=True)
 
 # --- СТРАНИЦА: АНАЛИТИКА ---
 elif st.session_state.page == "Аналитика":
     st.title("Результаты анализа")
 
-    # Проверяем, что выбрана категория или товар
     if st.session_state.get('current_sku'):
-        # Анализ для конкретного товара
         current_sku = st.session_state.current_sku
-        summary = get_summary(current_sku)
+        summary_text, chart_html = get_product_analytics(current_sku)
 
-        if summary:
+        if summary_text:
             st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
 
-            # Блок с резюме от нейросети
-            st.markdown(f'<div class="result-box">{summary}</div>', unsafe_allow_html=True)
+            # 1. Текстовое резюме
+            st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
 
-            st.write("")
-            # Дополнительные детали
-            with st.expander("🔍 Посмотреть исходные данные (отзывы)"):
-                reviews = get_reviews(current_sku)
-                if reviews is not None and not reviews.empty:
-                    st.dataframe(reviews, use_container_width=True)
+            # 2. Визуализация (График из БД)
+            if chart_html:
+                st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
+                components.html(chart_html, height=450, scrolling=True)
+
+            # 3. Исходные отзывы
+            with st.expander("🔍 Посмотреть детальные отзывы и уверенность модели"):
+                reviews_df = get_reviews(current_sku)
+                if reviews_df is not None and not reviews_df.empty:
+                    # Применяем цветовое форматирование к тональности
+                    styled_reviews = reviews_df.style.map(color_sentiment, subset=['sentiment'])
+                    st.dataframe(styled_reviews, use_container_width=True)
                 else:
-                    st.write("Тексты отзывов для этого артикула не найдены.")
+                    st.info("Отзывы не найдены.")
         else:
-            st.warning(f"Аналитика для артикула {current_sku} еще не сформирована.")
-
-    elif st.session_state.get('current_category'):
-        # Анализ для всей категории
-        category = st.session_state.current_category
-        st.markdown(f"#### 📊 Анализ категории: {category}")
-
-        # Пример результата для категории
-        st.markdown("""
-        <div class="result-box">
-        <b>Основные инсайты по категории "Электроника":</b><br>
-        • 78% положительных отзывов<br>
-        • Основные преимущества: "отличная камера", "быстрая зарядка"<br>
-        • Основные недостатки: "низкое качество звука", "перегрев"<br>
-        • Рекомендация: улучшить аудиосистему в следующих моделях
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.write("")
-        st.subheader("Товары в категории")
-        category_products = product_df[product_df['category'] == category]
-        if not category_products.empty:
-            category_display = category_products[['nm_id', 'product_name']].rename(
-                columns={'nm_id': 'ID Товара', 'product_name': 'Наименование'}
-            )
-            st.dataframe(category_display, use_container_width=True)
-        else:
-            st.info("В этой категории нет товаров")
-
+            st.warning(f"Аналитика для артикула {current_sku} находится в обработке.")
     else:
-        # Состояние "ничего не выбрано"
-        st.info("⬅️ Пожалуйста, выберите товар или категорию на главной странице, чтобы увидеть отчет.")
+        st.info("⬅️ Выберите товар на главной странице для просмотра аналитики.")
 
 # --- СТРАНИЦА: О ПРОЕКТЕ ---
 elif st.session_state.page == "О проекте":
     st.title("О проекте")
     st.markdown("""
-    Система InsightCopy AI разработана для автоматизации глубокого анализа клиентского опыта. 
-    Мы помогаем селлерам понимать, что именно ценят покупатели и над какими недостатками стоит работать.
+    **InsightCopy AI** — это инструмент для глубокого NLP-анализа отзывов. 
+    Мы используем современные архитектуры трансформеров для обеспечения **аналитической точности**.
 
-    **Ключевой функционал:**
-    1.  **Сбор данных**: Автоматизированный парсинг отзывов.
-    2.  **Анализ тональности**: Модель **BERT** для точного разделения мнений.
-    3.  **Интерпретация**: Выделение смысловых триггеров с помощью **SHAP**.
-    4.  **Сводка**: Генерация итогового текста для карточки товара или отдела качества.
-
-    **Технологии:** Python, Streamlit, Yandex Managed PostgreSQL, Transformers.
+    **Стек технологий:**
+    *   **LLM Core:** Модели семейства BERT для классификации тональности.
+    *   **Backend:** PostgreSQL (Managed) для хранения результатов.
+    *   **Visuals:** Plotly/D3.js для интерактивных графиков.
+    *   **Frontend:** Streamlit для быстрого доступа к инсайтам.
     """)
     st.divider()
     st.image("https://huggingface.co/front/assets/huggingface_logo-noborder.svg", width=80)
