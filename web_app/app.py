@@ -87,10 +87,33 @@ st.markdown("""
         line-height: 1.6;
         margin-bottom: 20px;
     }
-    /* Это сделает интерфейс более собранным (как в "it-girl" эстетике) */
+    /* Убираем центрирование для всего приложения и прижимаем к левому краю */
     .main .block-container {
-        max-width: 900px;
-        margin: 0 auto;
+        max-width: 1200px; /* Общий лимит ширины, чтобы текст не растягивался в бесконечность */
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        padding-left: 5rem; /* Добавляем элегантный отступ слева */
+    }
+
+    /* Ограничиваем ширину конкретно блоков выбора товаров и поиска */
+    div[data-testid="stExpander"], 
+    div[data-testid="stTextInput"],
+    div.stAlert {
+        max-width: 700px !important; /* Делаем блок компактным */
+        margin-left: 0 !important;
+        margin-right: auto !important;
+    }
+
+    /* Подправляем заголовок секции, чтобы он тоже был в лимитированной ширине */
+    .section-title {
+        max-width: 700px;
+        justify-content: flex-start;
+    }
+    
+    /* Делаем разделитель (st.divider) тоже коротким под ширину блока */
+    hr {
+        max-width: 700px;
+        margin-left: 0 !important;
     }
 
     /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
