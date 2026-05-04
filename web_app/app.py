@@ -165,25 +165,56 @@ if st.session_state.page == "Главная":
         """,
         unsafe_allow_html=True
     )
-    search_query = st.text_input("Поиск по категориям", placeholder="Например: Красота", label_visibility="collapsed")
+    # --- СОЗДАЕМ КОЛОНКИ ---
+    # ratio [2, 1] значит, что левая колонка будет в два раза шире правой
+    col_nav, col_upload = st.columns([2, 1], gap="large")
 
-    if not product_df.empty:
-        categories = product_df['category_name'].unique()
-        if search_query:
-            categories = [cat for cat in categories if search_query.lower() in cat.lower()]
+    # --- ЛЕВАЯ КОЛОНКА: НАВИГАЦИЯ ---
+    with col_nav:
+        search_query = st.text_input(
+            "Поиск по категориям",
+            placeholder="Например: Красота",
+            label_visibility="collapsed"
+        )
 
-        for category in categories:
-            with st.expander(f"{category}", expanded=False):
-                cat_prods = product_df[product_df['category_name'] == category]
-                for _, row in cat_prods.iterrows():
-                    # Проверяем, выбран ли этот товар сейчас
-                    is_active = st.session_state.current_sku == row['nm_id']
-                    button_label = f"✓  {row['product_name']}" if is_active else f"{row['product_name']}"
+        if not product_df.empty:
+            categories = product_df['category_name'].unique()
+            if search_query:
+                categories = [cat for cat in categories if search_query.lower() in cat.lower()]
 
-                    if st.button(button_label, key=f"btn_{row['nm_id']}", use_container_width=True):
-                        st.session_state.current_sku = row['nm_id']
-                        st.session_state.current_category = category
-                        st.rerun()  # Перезапускаем, чтобы показать кнопку перехода
+            for category in categories:
+                with st.expander(f"{category}", expanded=False):
+                    cat_prods = product_df[product_df['category_name'] == category]
+                    for _, row in cat_prods.iterrows():
+                        is_active = st.session_state.current_sku == row['nm_id']
+
+                        # Используем нормальную Google-иконку, как обсуждали ранее
+                        icon_name = ":material/check_circle:" if is_active else None
+
+                        if st.button(
+                                row['product_name'],
+                                icon=icon_name,
+                                key=f"btn_{row['nm_id']}",
+                                use_container_width=True
+                        ):
+                            st.session_state.current_sku = row['nm_id']
+                            st.session_state.current_category = category
+                            st.rerun()
+
+    # --- ПРАВАЯ КОЛОНКА: ЗАГРУЗКА ФАЙЛОВ ---
+    with col_upload:
+        st.markdown("### 📤 Загрузка данных")
+        uploaded_files = st.file_uploader(
+            "Перетащите файлы сюда",
+            type=["csv", "xlsx", "txt"],
+            accept_multiple_files=True,
+            help="Поддерживаются форматы CSV, Excel и TXT"
+        )
+
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                st.success(f"Файл '{uploaded_file.name}' готов к обработке")
+                # Здесь будет ваша логика обработки файлов
 
     # --- УЛУЧШЕНИЕ: КНОПКА ПЕРЕХОДА К АНАЛИТИКЕ ---
     if st.session_state.current_sku:
