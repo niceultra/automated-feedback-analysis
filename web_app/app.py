@@ -106,7 +106,18 @@ product_df = get_all_products()
 
 # --- БОКОВАЯ ПАНЕЛЬ (SIDEBAR) ---
 with st.sidebar:
-    st.title("📂 InsightCopy AI")
+    # --- ЗАГОЛОВОК С ВАШЕЙ КАРТИНКОЙ ---
+    # Создаем две колонки: узкую для лого и широкую для текста
+    col1, col2 = st.columns([1, 4])
+
+    with col1:
+        # Укажите путь к вашему логотипу. Ширину (width) подберите под себя
+        st.image("./images/logo.png", width=45)
+
+    with col2:
+        # Текст заголовка без эмодзи
+        st.title("InsightCopy AI")
+
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
 
