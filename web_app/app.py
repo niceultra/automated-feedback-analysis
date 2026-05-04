@@ -144,7 +144,7 @@ if st.session_state.page == "Главная":
 
     # Метрики (оставляем как есть)
     m1, m2, m3 = st.columns(3)
-    m1.metric("Позиций в базе", f'len(product_df)')
+    m1.metric("Позиций в базе", f'{len(product_df)}')
     m2.metric("Активность системы", "Высокая")
     m3.metric("Точность модели", "94%", delta="↑ 2%")
 
