@@ -1,36 +1,24 @@
-import os
 import streamlit as st
-from PIL import Image
+import os
+import logging
 
+# Включаем подробное логирование Streamlit
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-def local_css(file_name):
-    parent_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(parent_dir, file_name)
+# Проверяем загрузку страниц
+st.sidebar.write("### Отладка страниц")
+try:
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-    if os.path.exists(file_path):
-        with open(file_path, encoding="utf-8") as f:
-            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    else:
-        st.error(f"Файл {file_name} не найден по пути: {file_path}")
+    ctx = get_script_run_ctx()
+    if ctx and ctx.page_script_hash:
+        st.sidebar.write(f"Текущая страница: {ctx.page_script_hash}")
 
-
-# 1. Настройка страницы
-st.set_page_config(
-    page_title="InsightCopy AI",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Подключаем стили
-local_css("style.css")
-
-# Боковая панель (Streamlit автоматически добавит навигацию по страницам)
-with st.sidebar:
-    st.title("📂 InsightCopy AI")
-    st.caption("Sentiment Analysis Dashboard")
-    st.divider()
-
-    # Streamlit автоматически добавит здесь навигацию по страницам из папки pages
-    st.markdown("### Дополнительные настройки")
-    # Здесь могут быть другие элементы управления
+    # Проверяем, какие страницы обнаружены
+    if hasattr(st, '_main_run_count'):
+        st.sidebar.write("Обнаруженные страницы:")
+        for page in st._get_all_pages():
+            st.sidebar.write(f"- {page['page_name']}")
+except Exception as e:
+    st.sidebar.error(f"Ошибка при проверке страниц: {str(e)}")
