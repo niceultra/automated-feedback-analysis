@@ -12,6 +12,7 @@ def local_css(file_name):
     # Соединяем путь с именем файла
     file_path = os.path.join(parent_dir, file_name)
 
+
     if os.path.exists(file_path):
         with open(file_path, encoding="utf-8") as f:
             st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
