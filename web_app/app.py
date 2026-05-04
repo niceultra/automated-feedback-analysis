@@ -169,6 +169,7 @@ if st.session_state.page == "Главная":
 
         st.info(f"Выбран товар: **{selected_name}**")
 
+
         # Большая кнопка перехода
         if st.button("🚀 Перейти к детальной аналитике", type="primary", use_container_width=True):
             st.session_state.page = "Аналитика"
