@@ -22,8 +22,10 @@
     color: #ffffff !important;
 }
 
- [data-testid="stSidebar"] div.stButton > button[key*="active"] {
+/* Активный пункт меню для светлой темы */
+[data-testid="stSidebar"] div.stButton > button[key*="active"] {
     background-color: #e0e0e0 !important; /* Светло-серый */
+    color: #333333 !important; /* Темный текст для контраста */
     font-weight: 500 !important;
     border-radius: 6px !important; /* Добавляем скругление углов */
     box-shadow: none !important; /* Убираем тень */
