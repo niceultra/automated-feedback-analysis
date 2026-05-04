@@ -22,19 +22,23 @@
     color: #ffffff !important;
 }
 
-/* Активный пункт меню */
+/* Активный пункт меню для светлой темы */
 [data-testid="stSidebar"] div.stButton > button[key*="active"] {
-    background-color: #3d4655 !important;
-    color: #ffffff !important;
+    background-color: #3d4655 !important; /* Темно-серый */
+    color: #ffffff !important; /* Белый текст */
     font-weight: 500 !important;
+    border-radius: 6px !important; /* Добавляем скругление углов */
+    box-shadow: none !important; /* Убираем тень */
 }
 
-[data-testid="stSidebar"] div.stButton > button:focus:not(:active) {
-    box-shadow: none !important;
-    color: #ffffff !important;
+/* Активный пункт меню для темной темы */
+.stApp.stAppDark [data-testid="stSidebar"] div.stButton > button[key*="active"] {
+    background-color: #e0e0e0 !important; /* Светло-серый */
+    color: #333333 !important; /* Темный текст для контраста */
+    font-weight: 500 !important;
+    border-radius: 6px !important; /* Добавляем скругление углов */
+    box-shadow: none !important; /* Убираем тень */
 }
-
-
 
 
 
