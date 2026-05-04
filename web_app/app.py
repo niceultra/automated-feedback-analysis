@@ -96,7 +96,6 @@ st.markdown("""
         padding-left: 15px;
         width: 100%;
     }
-
     .section-title {
         font-size: 1.2rem;
         font-weight: 600;
