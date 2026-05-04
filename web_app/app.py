@@ -74,11 +74,11 @@ def get_all_products():
     except:
         return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
 
-
 # --- КАСТОМНЫЙ CSS ---
 st.markdown("""
     <style>
     .block-container { padding-top: 2rem; }
+
     .result-box {
         padding: 25px;
         border-radius: 15px;
@@ -87,6 +87,16 @@ st.markdown("""
         line-height: 1.6;
         margin-bottom: 20px;
     }
+
+    /* НАШЕ ИСПРАВЛЕНИЕ ДЛЯ КНОПОК */
+    div.stButton > button {
+        display: flex;
+        justify-content: flex-start;
+        text-align: left;
+        padding-left: 15px;
+        width: 100%;
+    }
+
     .section-title {
         font-size: 1.2rem;
         font-weight: 600;
@@ -95,8 +105,6 @@ st.markdown("""
         align-items: center;
         gap: 10px;
     }
-    /* Стилизация метрик для чистого вида */
-    [data-testid="stMetricValue"] { font-size: 1.8rem; }
     </style>
     """, unsafe_allow_html=True)
 
