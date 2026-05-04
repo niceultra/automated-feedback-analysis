@@ -203,12 +203,12 @@ if st.session_state.page == "Главная":
 
     # --- ПРАВАЯ КОЛОНКА: ЗАГРУЗКА ФАЙЛОВ ---
     with col_upload:
-        st.markdown("### 📤 Загрузка данных")
+        st.markdown("###Загрузка данных")
         uploaded_files = st.file_uploader(
-            "Перетащите файлы сюда",
-            type=["csv", "xlsx", "txt"],
+            "Перетащите файл с отзывами сюда, чтобы проанализировать с помощью нейросети",
+            type=["csv", "xlsx"],
             accept_multiple_files=True,
-            help="Поддерживаются форматы CSV, Excel и TXT"
+            help="Поддерживаются форматы CSV и Excel"
         )
 
         if uploaded_files:
