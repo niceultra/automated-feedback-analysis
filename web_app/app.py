@@ -107,13 +107,6 @@ with st.sidebar:
     st.caption("Sentiment Analysis Dashboard")
     st.divider()
 
-    st.markdown("### Навигация")
-    if st.button("🏠 Главная", use_container_width=True):
-        st.session_state.page = "Главная"
-    if st.button("📈 Аналитика", use_container_width=True):
-        st.session_state.page = "Аналитика"
-    if st.button("ℹ️ О проекте", use_container_width=True):
-        st.session_state.page = "О проекте"
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
