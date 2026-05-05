@@ -5,6 +5,7 @@ import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
 import plotly.express as px
+import google.generativeai as genai
 
 
 def local_css(file_name):
@@ -58,6 +59,43 @@ def get_db_connection():
         port=6432,
         sslmode='require'
     )
+
+
+def generate_marketing_content(strengths, weaknesses):
+    """
+    Генерирует маркетинговый отчет на основе списков плюсов и минусов.
+    """
+    # Настройка API ключа (убедитесь, что добавили его в .streamlit/secrets.toml)
+    if "GEMINI_API_KEY" not in st.secrets:
+        return "Ошибка: Не найден GEMINI_API_KEY в секретах приложения."
+
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-pro')
+
+    # Формируем запрос для нейросети
+    prompt = f"""
+    Ты — ведущий маркетинговый аналитик. На основе данных анализа отзывов составь стратегический отчет для продавца на маркетплейсе.
+
+    СИЛЬНЫЕ СТОРОНЫ ТОВАРА:
+    {', '.join(strengths) if strengths else 'Не выявлено'}
+
+    СЛАБЫЕ СТОРОНЫ ТОВАРА:
+    {', '.join(weaknesses) if weaknesses else 'Не выявлено'}
+
+    Твоя задача составить отчет по следующим пунктам:
+    1. Уникальное торговое предложение (УТП) — на чем сделать акцент в рекламе.
+    2. Рекомендации по улучшению продукта — как устранить негатив.
+    3. Идеи для инфографики — какие буллиты вынести на главные фото.
+    4. Тональность ответов — как общаться с покупателями в отзывах.
+
+    Пиши профессионально, лаконично и на русском языке. Используй Markdown для оформления.
+    """
+
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Произошла ошибка при обращении к Gemini AI: {str(e)}"
 
 
 def get_product_analytics(nm_id):
