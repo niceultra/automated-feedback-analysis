@@ -95,6 +95,47 @@ def get_all_products():
         return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
 
 
+def get_product_summary(nm_id):
+    """
+    Получает полную аналитику товара из базы данных
+
+    Args:
+        nm_id (str): Артикул товара
+
+    Returns:
+        dict: Словарь с данными аналитики
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Выбираем необходимые колонки
+        query = """
+        SELECT 
+            summary_text,
+            chart_html
+        FROM 
+            product_summary
+        WHERE 
+            nm_id = %s
+        """
+        cursor.execute(query, (str(nm_id),))
+        result = cursor.fetchone()
+
+        conn.close()
+
+        if result:
+            return {
+                'summary_text': result[0],
+                'chart_html': result[1]
+            }
+        else:
+            return None
+    except Exception as e:
+        st.error(f"Ошибка при получении аналитики: {str(e)}")
+        return None
+
+
 def extract_strengths_weaknesses(summary_text):
     """
     Извлекает сильные и слабые стороны из текста аналитики
@@ -121,25 +162,24 @@ def extract_strengths_weaknesses(summary_text):
             strengths_text = summary_text[strengths_start + len("КЛЮЧЕВЫЕ ПЛЮСЫ:"):weaknesses_start].strip()
             weaknesses_text = summary_text[weaknesses_start + len("КЛЮЧЕВЫЕ МИНУСЫ:"):].strip()
 
-            # Обрабатываем сильные стороны
-            for line in strengths_text.split('\n'):
-                line = line.strip()
-                # Ищем строки, которые начинаются с цифры и точки/скобки
-                if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
-                    # Удаляем номер пункта
-                    point = line[2:].strip().rstrip('.')
-                    if point:
-                        strengths.append(point)
+            # Функция для парсинга пунктов
+            def parse_points(text):
+                points = []
+                for line in text.split('\n'):
+                    line = line.strip()
+                    # Ищем строки, которые начинаются с цифры и точки/скобки
+                    if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
+                        # Удаляем номер пункта
+                        point = line[2:].strip().rstrip('.')
+                        if point:
+                            points.append(point)
+                return points
 
-            # Обрабатываем слабые стороны
-            for line in weaknesses_text.split('\n'):
-                line = line.strip()
-                # Ищем строки, которые начинаются с цифры и точки/скобки
-                if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
-                    # Удаляем номер пункта
-                    point = line[2:].strip().rstrip('.')
-                    if point:
-                        weaknesses.append(point)
+            # Парсим сильные стороны
+            strengths = parse_points(strengths_text)
+
+            # Парсим слабые стороны
+            weaknesses = parse_points(weaknesses_text)
     except Exception as e:
         st.error(f"Ошибка при извлечении данных: {str(e)}")
 
