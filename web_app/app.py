@@ -184,6 +184,38 @@ def extract_strengths_weaknesses(summary_text):
         st.error(f"Ошибка при извлечении данных: {str(e)}")
 
     return strengths, weaknesses
+
+
+def extract_sentiment_data(summary_text):
+    """
+    Извлекает данные о количестве отзывов из текста аналитики
+
+    Args:
+        summary_text (str): Текст аналитики из БД
+
+    Returns:
+        dict: Словарь с количеством позитивных, негативных и нейтральных отзывов
+    """
+    if not summary_text:
+        return None
+
+    try:
+        # Ищем данные о количестве отзывов
+        positive_match = re.search(r'Позитивных: (\d+)', summary_text)
+        negative_match = re.search(r'Негативных: (\d+)', summary_text)
+        neutral_match = re.search(r'Нейтральных: (\d+)', summary_text)
+
+        if positive_match and negative_match and neutral_match:
+            return {
+                'positive_count': int(positive_match.group(1)),
+                'negative_count': int(negative_match.group(1)),
+                'neutral_count': int(neutral_match.group(1))
+            }
+        return None
+    except Exception as e:
+        st.error(f"Ошибка при извлечении данных: {str(e)}")
+        return None
+
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
     # Соответствие согласно Ledger: 1-neg, 2-pos, 0-neutral
