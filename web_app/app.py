@@ -46,6 +46,57 @@ DB_USER = st.secrets["DB_USER"]
 DB_PASS = st.secrets["DB_PASS"]
 
 
+def extract_strengths_weaknesses(summary_text):
+    """
+    Извлекает сильные и слабые стороны из текста аналитики
+
+    Args:
+        summary_text (str): Текст аналитики из БД
+
+    Returns:
+        tuple: (список сильных сторон, список слабых сторон)
+    """
+    if not summary_text:
+        return [], []
+
+    strengths = []
+    weaknesses = []
+
+    try:
+        # Ищем раздел с ключевыми плюсами и минусами
+        strengths_start = summary_text.find("КЛЮЧЕВЫЕ ПЛЮСЫ:")
+        weaknesses_start = summary_text.find("КЛЮЧЕВЫЕ МИНУСЫ:")
+
+        if strengths_start != -1 and weaknesses_start != -1:
+            # Извлекаем текст между разделами
+            strengths_text = summary_text[strengths_start + len("КЛЮЧЕВЫЕ ПЛЮСЫ:"):weaknesses_start].strip()
+            weaknesses_text = summary_text[weaknesses_start + len("КЛЮЧЕВЫЕ МИНУСЫ:"):].strip()
+
+            # Обрабатываем сильные стороны
+            for line in strengths_text.split('\n'):
+                line = line.strip()
+                # Ищем строки, которые начинаются с цифры и точки/скобки
+                if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
+                    # Удаляем номер пункта
+                    point = line[2:].strip().rstrip('.')
+                    if point:
+                        strengths.append(point)
+
+            # Обрабатываем слабые стороны
+            for line in weaknesses_text.split('\n'):
+                line = line.strip()
+                # Ищем строки, которые начинаются с цифры и точки/скобки
+                if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
+                    # Удаляем номер пункта
+                    point = line[2:].strip().rstrip('.')
+                    if point:
+                        weaknesses.append(point)
+    except Exception as e:
+        st.error(f"Ошибка при извлечении данных: {str(e)}")
+
+    return strengths, weaknesses
+
+
 # --- ФУНКЦИИ БАЗЫ ДАННЫХ ---
 def get_db_connection():
     return psycopg2.connect(
