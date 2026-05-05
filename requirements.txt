@@ -7,4 +7,4 @@ streamlit
 pandas
 psycopg2-binary
 plotly==5.19.0
-re
+
