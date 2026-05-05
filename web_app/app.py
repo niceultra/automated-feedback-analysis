@@ -201,6 +201,20 @@ if st.session_state.page == "Главная":
                             st.session_state.current_category = category
                             st.rerun()
 
+            # --- УЛУЧШЕНИЕ: КНОПКА ПЕРЕХОДА К АНАЛИТИКЕ ---
+            if st.session_state.current_sku:
+                st.write("")  # Отступ
+                # Находим имя выбранного товара для красоты
+                selected_name = product_df[product_df['nm_id'] == st.session_state.current_sku]['product_name'].values[
+                    0]
+
+                st.info(f"Выбран товар: **{selected_name}**")
+
+                # Большая кнопка перехода
+                if st.button("Анализировать", type="primary", use_container_width=True):
+                    st.session_state.page = "Аналитика"
+                    st.rerun()
+
     # --- ПРАВАЯ КОЛОНКА: ЗАГРУЗКА ФАЙЛОВ ---
     with col_upload:
         st.markdown("### Загрузка данных")
@@ -216,19 +230,7 @@ if st.session_state.page == "Главная":
                 st.success(f"Файл '{uploaded_file.name}' готов к обработке")
                 # Здесь будет ваша логика обработки файлов
 
-    # --- УЛУЧШЕНИЕ: КНОПКА ПЕРЕХОДА К АНАЛИТИКЕ ---
-    if st.session_state.current_sku:
-        st.write("")  # Отступ
-        # Находим имя выбранного товара для красоты
-        selected_name = product_df[product_df['nm_id'] == st.session_state.current_sku]['product_name'].values[0]
 
-        st.info(f"Выбран товар: **{selected_name}**")
-
-
-        # Большая кнопка перехода
-        if st.button("Анализировать", type="primary", use_container_width=True):
-            st.session_state.page = "Аналитика"
-            st.rerun()
 
     st.divider()
 
@@ -246,22 +248,76 @@ elif st.session_state.page == "Аналитика":
 
     if st.session_state.get('current_sku'):
         current_sku = st.session_state.current_sku
-        summary_text, chart_html = get_product_analytics(current_sku)
+        summary_text, _ = get_product_analytics(current_sku)  # chart_html больше не нужен
 
         if summary_text:
             st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
 
-            # 1. Текстовое резюме
-            st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
+            # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
+            col_chart, col_text = st.columns([1, 2])
 
-            # 2. Визуализация (График из БД)
-            if chart_html:
+            # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
+            with col_chart:
                 st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
-                components.html(chart_html, height=450, scrolling=True)
 
-            # 3. Исходные отзывы
-            with st.expander("🔍 Посмотреть детальные отзывы и уверенность модели"):
+                # Получаем отзывы и строим статистику
                 reviews_df = get_reviews(current_sku)
+                if reviews_df is not None and not reviews_df.empty:
+                    # Подсчитываем тональность
+                    sentiment_counts = reviews_df['sentiment'].value_counts().reset_index()
+                    sentiment_counts.columns = ['sentiment', 'count']
+
+                    # Преобразуем числовые значения в понятные названия
+                    sentiment_labels = {1: 'Негативные', 2: 'Позитивные', 0: 'Нейтральные'}
+                    sentiment_colors = {1: '#f44336', 2: '#4caf50', 0: '#9e9e9e'}
+
+                    sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
+                    sentiment_counts['color'] = sentiment_counts['sentiment'].map(sentiment_colors)
+
+                    # Строим круговую диаграмму с помощью Plotly (более красивая, чем встроенные Streamlit)
+                    import plotly.express as px
+
+                    fig = px.pie(
+                        sentiment_counts,
+                        values='count',
+                        names='label',
+                        color='sentiment',
+                        color_discrete_map=sentiment_colors,
+                        hole=0.4
+                    )
+
+                    fig.update_traces(
+                        textposition='inside',
+                        textinfo='percent+label',
+                        hovertemplate="%{label}: %{value} отзывов<extra></extra>"
+                    )
+
+                    fig.update_layout(
+                        margin=dict(t=0, b=0, l=0, r=0),
+                        showlegend=False,
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)'
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
+                    # Добавляем легенду под графиком
+                    st.markdown("""
+                    <div style="display: flex; justify-content: center; gap: 15px; margin-top: -15px;">
+                        <span style="color: #f44336;">● Негативные</span>
+                        <span style="color: #4caf50;">● Позитивные</span>
+                        <span style="color: #9e9e9e;">● Нейтральные</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.info("Нет данных для построения графика")
+
+            # --- ПРАВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
+            with col_text:
+                st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
+
+            # 3. Исходные отзывы (оставляем как есть)
+            with st.expander("🔍 Подробная статистика отзывов"):
                 if reviews_df is not None and not reviews_df.empty:
                     # Применяем цветовое форматирование к тональности
                     styled_reviews = reviews_df.style.map(color_sentiment, subset=['sentiment'])
@@ -272,6 +328,7 @@ elif st.session_state.page == "Аналитика":
             st.warning(f"Аналитика для артикула {current_sku} находится в обработке.")
     else:
         st.info("⬅️ Выберите товар на главной странице для просмотра аналитики.")
+
 
 # --- СТРАНИЦА: О ПРОЕКТЕ ---
 elif st.session_state.page == "О проекте":
