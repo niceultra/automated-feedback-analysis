@@ -2,8 +2,8 @@ import os
 import streamlit as st
 import pandas as pd
 import psycopg2
+import streamlit.components.v1 as components
 from PIL import Image
-import re
 
 
 def local_css(file_name):
@@ -184,38 +184,6 @@ def extract_strengths_weaknesses(summary_text):
         st.error(f"Ошибка при извлечении данных: {str(e)}")
 
     return strengths, weaknesses
-
-
-def extract_sentiment_data(summary_text):
-    """
-    Извлекает данные о количестве отзывов из текста аналитики
-
-    Args:
-        summary_text (str): Текст аналитики из БД
-
-    Returns:
-        dict: Словарь с количеством позитивных, негативных и нейтральных отзывов
-    """
-    if not summary_text:
-        return None
-
-    try:
-        # Ищем данные о количестве отзывов
-        positive_match = re.search(r'Позитивных: (\d+)', summary_text)
-        negative_match = re.search(r'Негативных: (\d+)', summary_text)
-        neutral_match = re.search(r'Нейтральных: (\d+)', summary_text)
-
-        if positive_match and negative_match and neutral_match:
-            return {
-                'positive_count': int(positive_match.group(1)),
-                'negative_count': int(negative_match.group(1)),
-                'neutral_count': int(neutral_match.group(1))
-            }
-        return None
-    except Exception as e:
-        st.error(f"Ошибка при извлечении данных: {str(e)}")
-        return None
-
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
     # Соответствие согласно Ledger: 1-neg, 2-pos, 0-neutral
@@ -371,41 +339,71 @@ elif st.session_state.page == "Аналитика":
 
     if st.session_state.get('current_sku'):
         current_sku = st.session_state.current_sku
-        summary_text, chart_html = get_product_analytics(current_sku)
 
-        if summary_text:
+        # Получаем полную аналитику из БД
+        product_summary = get_product_summary(current_sku)
+
+        if product_summary and product_summary['summary_text']:
+            summary_text = product_summary['summary_text']
             st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
             col_chart, col_text = st.columns([1, 2])
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
+            # В начале файла
+            import plotly.express as px
+
+            # В левой колонке с графиком
             with col_chart:
                 st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
 
-                # ИЗВЛЕКАЕМ ДАННЫЕ ИЗ SUMMARY_TEXT
-                sentiment_data = extract_sentiment_data(summary_text)
+                reviews_df = get_reviews(current_sku)
+                if reviews_df is not None and not reviews_df.empty:
+                    # Подсчитываем тональность
+                    sentiment_counts = reviews_df['sentiment'].value_counts().reset_index()
+                    sentiment_counts.columns = ['sentiment', 'count']
 
-                if sentiment_data:
-                    # Подготавливаем данные для графика
-                    labels = ['Позитивные', 'Негативные', 'Нейтральные']
-                    values = [
-                        sentiment_data['positive_count'],
-                        sentiment_data['negative_count'],
-                        sentiment_data['neutral_count']
-                    ]
-                    colors = ['#4caf50', '#f44336', '#9e9e9e']
+                    # Определяем правильные метки и цвета
+                    sentiment_labels = {0: 'Нейтральные', 1: 'Негативные', 2: 'Позитивные'}
+                    sentiment_colors = {0: '#9e9e9e', 1: '#f44336', 2: '#4caf50'}
 
-                    # Создаем круговую диаграмму с помощью Plotly
-                    fig = go.Figure(data=[go.Pie(
-                        labels=labels,
-                        values=values,
-                        marker_colors=colors,
-                        hole=0.4,
-                        textinfo='percent+label',
+                    # Добавляем метки
+                    sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
+
+                    # ГАРАНТИРУЕМ НАЛИЧИЕ ВСЕХ ТРЕХ КАТЕГОРИЙ
+                    # Если какой-то категории нет, добавляем ее с нулевым значением
+                    for sentiment in [0, 1, 2]:
+                        if sentiment not in sentiment_counts['sentiment'].values:
+                            new_row = pd.DataFrame({
+                                'sentiment': [sentiment],
+                                'count': [0],
+                                'label': [sentiment_labels[sentiment]]
+                            })
+                            sentiment_counts = pd.concat([sentiment_counts, new_row], ignore_index=True)
+
+                    # СОЗДАЕМ ПРАВИЛЬНОЕ СОПОСТАВЛЕНИЕ ЦВЕТОВ С МЕТКАМИ
+                    label_colors = {
+                        'Нейтральные': '#9e9e9e',
+                        'Негативные': '#f44336',
+                        'Позитивные': '#4caf50'
+                    }
+
+                    # Создаем круговую диаграмму
+                    fig = px.pie(
+                        sentiment_counts,
+                        values='count',
+                        names='label',
+                        color='label',
+                        color_discrete_map=label_colors,
+                        hole=0.4
+                    )
+
+                    fig.update_traces(
                         textposition='inside',
-                        hovertemplate='%{label}: %{value} отзывов<extra></extra>'
-                    )])
+                        textinfo='percent+label',
+                        hovertemplate="%{label}: %{value} отзывов<extra></extra>"
+                    )
 
                     fig.update_layout(
                         showlegend=False,
@@ -431,7 +429,7 @@ elif st.session_state.page == "Аналитика":
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.info("Не удалось извлечь данные для построения графика")
+                    st.info("Нет данных для построения графика")
 
             # --- ПРАВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
             with col_text:
@@ -494,7 +492,6 @@ elif st.session_state.page == "Аналитика":
 
             # 3. Исходные отзывы
             with st.expander("🔍 Подробная статистика отзывов"):
-                reviews_df = get_reviews(current_sku)
                 if reviews_df is not None and not reviews_df.empty:
                     # Применяем цветовое форматирование к тональности
                     styled_reviews = reviews_df.style.map(color_sentiment, subset=['sentiment'])
