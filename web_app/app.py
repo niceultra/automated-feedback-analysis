@@ -351,10 +351,13 @@ elif st.session_state.page == "Аналитика":
             col_chart, col_text = st.columns([1, 2])
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
+            # В начале файла
+            import plotly.express as px
+
+            # В левой колонке с графиком
             with col_chart:
                 st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
 
-                # Получаем отзывы и строим статистику
                 reviews_df = get_reviews(current_sku)
                 if reviews_df is not None and not reviews_df.empty:
                     # Подсчитываем тональность
@@ -366,18 +369,36 @@ elif st.session_state.page == "Аналитика":
                     sentiment_colors = {1: '#f44336', 2: '#4caf50', 0: '#9e9e9e'}
 
                     sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
+                    sentiment_counts['color'] = sentiment_counts['sentiment'].map(sentiment_colors)
 
-                    # ПОДГОТОВКА ДАННЫХ ДЛЯ ВСТРОЕННОГО ГРАФИКА
-                    pie_data = pd.DataFrame({
-                        'Категория': sentiment_counts['label'],
-                        'Количество': sentiment_counts['count']
-                    })
+                    # Создаем круговую диаграмму с помощью plotly
+                    fig = px.pie(
+                        sentiment_counts,
+                        values='count',
+                        names='label',
+                        color='label',
+                        color_discrete_map=sentiment_colors,
+                        hole=0.4
+                    )
 
-                    # Используем st.bar_chart как альтернативу
-                    st.bar_chart(
-                        data=pie_data.set_index('Категория'),
+                    fig.update_traces(
+                        textposition='inside',
+                        textinfo='percent+label',
+                        hovertemplate="%{label}: %{value} отзывов<extra></extra>"
+                    )
+
+                    fig.update_layout(
+                        showlegend=False,
+                        margin=dict(t=0, b=0, l=0, r=0),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)'
+                    )
+
+                    # Используем st.plotly_chart
+                    st.plotly_chart(
+                        fig,
                         use_container_width=True,
-                        height=300
+                        config={'displayModeBar': False}
                     )
 
                     # Добавляем легенду под графиком
