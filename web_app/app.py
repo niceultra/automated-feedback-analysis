@@ -70,7 +70,7 @@ def generate_marketing_content(strengths, weaknesses):
         return "Ошибка: Не найден GEMINI_API_KEY в секретах приложения."
 
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
     # Формируем запрос для нейросети
     prompt = f"""
     Ты — ведущий маркетинговый аналитик. На основе данных анализа отзывов составь стратегический отчет для продавца на маркетплейсе.
