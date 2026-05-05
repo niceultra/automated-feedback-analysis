@@ -136,62 +136,53 @@ def get_product_summary(nm_id):
         return None
 
 
-def extract_statistics_from_summary(summary_text):
+def extract_strengths_weaknesses(summary_text):
     """
-    Извлекает статистику из текста аналитики
+    Извлекает сильные и слабые стороны из текста аналитики
 
     Args:
         summary_text (str): Текст аналитики из БД
 
     Returns:
-        dict: Словарь с количеством отзывов по категориям
+        tuple: (список сильных сторон, список слабых сторон)
     """
     if not summary_text:
-        return {
-            'Позитивные': 0,
-            'Негативные': 0,
-            'Нейтральные': 0
-        }
+        return [], []
+
+    strengths = []
+    weaknesses = []
 
     try:
-        # Ищем строку со статистикой
-        stats_start = summary_text.find("Статистика для товара")
-        if stats_start == -1:
-            # Попробуем найти по другому шаблону
-            stats_start = summary_text.find("Всего отзывов:")
-            if stats_start == -1:
-                return {
-                    'Позитивные': 0,
-                    'Негативные': 0,
-                    'Нейтральные': 0
-                }
+        # Ищем раздел с ключевыми плюсами и минусами
+        strengths_start = summary_text.find("КЛЮЧЕВЫЕ ПЛЮСЫ:")
+        weaknesses_start = summary_text.find("КЛЮЧЕВЫЕ МИНУСЫ:")
 
-        # Ищем конец статистики (перед началом КЛЮЧЕВЫЕ ПЛЮСЫ)
-        stats_end = summary_text.find("КЛЮЧЕВЫЕ ПЛЮСЫ:")
-        if stats_end == -1:
-            stats_end = len(summary_text)
+        if strengths_start != -1 and weaknesses_start != -1:
+            # Извлекаем текст между разделами
+            strengths_text = summary_text[strengths_start + len("КЛЮЧЕВЫЕ ПЛЮСЫ:"):weaknesses_start].strip()
+            weaknesses_text = summary_text[weaknesses_start + len("КЛЮЧЕВЫЕ МИНУСЫ:"):].strip()
 
-        stats_text = summary_text[stats_start:stats_end].strip()
+            # Функция для парсинга пунктов
+            def parse_points(text):
+                points = []
+                for line in text.split('\n'):
+                    line = line.strip()
+                    # Ищем строки, которые начинаются с цифры и точки/скобки
+                    if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
+                        # Удаляем номер пункта
+                        point = line[2:].strip().rstrip('.')
+                        if point:
+                            points.append(point)
+                return points
 
-        # Извлекаем числа с помощью регулярных выражений
-        import re
-        total = re.search(r'Всего отзывов: (\d+)', stats_text)
-        positive = re.search(r'Позитивных: (\d+)', stats_text)
-        negative = re.search(r'Негативных: (\d+)', stats_text)
-        neutral = re.search(r'Нейтральных: (\d+)', stats_text)
+            # Парсим сильные стороны
+            strengths = parse_points(strengths_text)
 
-        return {
-            'Позитивные': int(positive.group(1)) if positive else 0,
-            'Негативные': int(negative.group(1)) if negative else 0,
-            'Нейтральные': int(neutral.group(1)) if neutral else 0
-        }
+            # Парсим слабые стороны
+            weaknesses = parse_points(weaknesses_text)
     except Exception as e:
-        st.error(f"Ошибка при извлечении статистики: {str(e)}")
-        return {
-            'Позитивные': 0,
-            'Негативные': 0,
-            'Нейтральные': 0
-        }
+        st.error(f"Ошибка при извлечении данных: {str(e)}")
+
     return strengths, weaknesses
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
