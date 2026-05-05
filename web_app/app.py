@@ -492,26 +492,31 @@ elif st.session_state.page == "Аналитика":
 
                 # Отображаем результат, если он уже сгенерирован
                 if 'content_generated' in st.session_state and st.session_state.content_generated:
+                    # Защита от пустых данных или None
+                    report_data = str(st.session_state.get('marketing_content', ''))
+
                     st.markdown('<div class="result-box" style="margin-top: 20px;">', unsafe_allow_html=True)
                     st.markdown("### 📈 Стратегический маркетинговый отчет")
-                    st.markdown(st.session_state.marketing_content)
+                    st.markdown(report_data)
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     # Добавляем кнопки действий
                     col1, col2 = st.columns([1, 1])
                     with col1:
-                        st.download_button(
-                            label="Скачать отчет",
-                            data=st.session_state.marketing_content,
-                            file_name=f"marketing_report_{current_sku}.md",
-                            mime="text/markdown",
-                            use_container_width=True,
-                            icon=":material/download:"
-                        )
+                        # ПРОВЕРКА: Если данных нет, кнопка будет неактивна или не вызовет ошибку
+                        if report_data:
+                            st.download_button(
+                                label="Скачать отчет",
+                                data=report_data,  # Теперь мы уверены, что это строка
+                                file_name=f"marketing_report_{current_sku}.md",
+                                mime="text/markdown",
+                                width='stretch',  # Заменили use_container_width на стандарт 2026 года
+                                icon=":material/download:"
+                            )
 
                     with col2:
                         if st.button("Сгенерировать заново",
-                                     use_container_width=True,
+                                     width='stretch',
                                      icon=":material/refresh:"):
                             # Удаляем предыдущий результат
                             if 'marketing_content' in st.session_state:
