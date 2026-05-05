@@ -4,6 +4,9 @@ import pandas as pd
 import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
+# Добавьте эти импорты в раздел существующих импортов
+import plotly.express as px
+import plotly.graph_objects as go
 
 
 def local_css(file_name):
