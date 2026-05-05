@@ -4,8 +4,6 @@ import pandas as pd
 import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
-import plotly.express as px
-
 
 
 def local_css(file_name):
@@ -250,7 +248,7 @@ elif st.session_state.page == "Аналитика":
 
     if st.session_state.get('current_sku'):
         current_sku = st.session_state.current_sku
-        summary_text, _ = get_product_analytics(current_sku)  # chart_html больше не нужен
+        summary_text, _ = get_product_analytics(current_sku)
 
         if summary_text:
             st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
@@ -276,9 +274,7 @@ elif st.session_state.page == "Аналитика":
                     sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
                     sentiment_counts['color'] = sentiment_counts['sentiment'].map(sentiment_colors)
 
-                    # Строим круговую диаграмму с помощью Plotly (более красивая, чем встроенные Streamlit)
-
-
+                    # ПРАВИЛЬНОЕ ПОСТРОЕНИЕ ГРАФИКА ДЛЯ STREAMLIT
                     fig = px.pie(
                         sentiment_counts,
                         values='count',
@@ -298,10 +294,17 @@ elif st.session_state.page == "Аналитика":
                         margin=dict(t=0, b=0, l=0, r=0),
                         showlegend=False,
                         paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)'
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        height=300  # Фиксируем высоту для лучшего отображения в колонке
                     )
 
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                    # ОСНОВНОЕ ИЗМЕНЕНИЕ: ИСПОЛЬЗУЕМ st.plotly_chart СОГЛАСНО ДОКУМЕНТАЦИИ
+                    st.plotly_chart(
+                        fig,
+                        use_container_width=True,
+                        theme="streamlit",  # Используем тему Streamlit по умолчанию
+                        config={'displayModeBar': False}  # Скрываем панель инструментов
+                    )
 
                     # Добавляем легенду под графиком
                     st.markdown("""
@@ -317,6 +320,61 @@ elif st.session_state.page == "Аналитика":
             # --- ПРАВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
             with col_text:
                 st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
+
+                # --- ГЕНЕРАЦИЯ МАРКЕТИНГОВОГО КОНТЕНТА ---
+                st.markdown('<div class="section-title">💡 Генерация маркетингового контента</div>',
+                            unsafe_allow_html=True)
+
+                # Извлекаем сильные и слабые стороны
+                strengths, weaknesses = extract_strengths_weaknesses(summary_text)
+
+                # Проверяем, есть ли данные для генерации
+                if strengths or weaknesses:
+                    # Показываем краткую статистику
+                    st.caption(f"Найдено: {len(strengths)} сильных сторон и {len(weaknesses)} слабых сторон")
+
+                    # Кнопка для генерации контента
+                    if st.button("Сгенерировать стратегический маркетинговый отчет",
+                                 type="primary",
+                                 icon=":material/rocket_launch:",
+                                 use_container_width=True):
+                        with st.spinner("Генерация контента через Google Gemini... Это займет 15-20 секунд"):
+                            # Генерируем контент
+                            marketing_content = generate_marketing_content(strengths, weaknesses)
+
+                            # Сохраняем результат в состояние
+                            st.session_state.marketing_content = marketing_content
+                            st.session_state.content_generated = True
+
+                # Отображаем результат, если он уже сгенерирован
+                if 'content_generated' in st.session_state and st.session_state.content_generated:
+                    st.markdown('<div class="result-box" style="margin-top: 20px;">', unsafe_allow_html=True)
+                    st.markdown("### 📈 Стратегический маркетинговый отчет")
+                    st.markdown(st.session_state.marketing_content)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    # Добавляем кнопки действий
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.download_button(
+                            label="Скачать отчет",
+                            data=st.session_state.marketing_content,
+                            file_name=f"marketing_report_{current_sku}.md",
+                            mime="text/markdown",
+                            use_container_width=True,
+                            icon=":material/download:"
+                        )
+
+                    with col2:
+                        if st.button("Сгенерировать заново",
+                                     use_container_width=True,
+                                     icon=":material/refresh:"):
+                            # Удаляем предыдущий результат
+                            if 'marketing_content' in st.session_state:
+                                del st.session_state.marketing_content
+                            if 'content_generated' in st.session_state:
+                                del st.session_state.content_generated
+                            st.rerun()
 
             # 3. Исходные отзывы (оставляем как есть)
             with st.expander("🔍 Подробная статистика отзывов"):
