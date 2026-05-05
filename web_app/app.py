@@ -339,9 +339,12 @@ elif st.session_state.page == "Аналитика":
 
     if st.session_state.get('current_sku'):
         current_sku = st.session_state.current_sku
-        summary_text, _ = get_product_analytics(current_sku)
 
-        if summary_text:
+        # Получаем полную аналитику из БД
+        product_summary = get_product_summary(current_sku)
+
+        if product_summary and product_summary['summary_text']:
+            summary_text = product_summary['summary_text']
             st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
@@ -365,30 +368,17 @@ elif st.session_state.page == "Аналитика":
                     sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
 
                     # ПОДГОТОВКА ДАННЫХ ДЛЯ ВСТРОЕННОГО ГРАФИКА
-                    # Создаем DataFrame для pie chart
                     pie_data = pd.DataFrame({
                         'Категория': sentiment_counts['label'],
                         'Количество': sentiment_counts['count']
                     })
 
-                    # Используем st.pie_chart (доступен в новых версиях Streamlit)
-                    # Если у вас старая версия Streamlit, используем альтернативный метод
-                    try:
-                        # Новые версии Streamlit (>=1.24) поддерживают st.pie_chart
-                        st.pie_chart(
-                            data=pie_data,
-                            names='Категория',
-                            values='Количество',
-                            color_discrete_map=sentiment_colors,
-                            use_container_width=True
-                        )
-                    except AttributeError:
-                        # Старые версии Streamlit - используем st.bar_chart как альтернативу
-                        st.bar_chart(
-                            data=pie_data.set_index('Категория'),
-                            use_container_width=True,
-                            height=300
-                        )
+                    # Используем st.bar_chart как альтернативу
+                    st.bar_chart(
+                        data=pie_data.set_index('Категория'),
+                        use_container_width=True,
+                        height=300
+                    )
 
                     # Добавляем легенду под графиком
                     st.markdown("""
