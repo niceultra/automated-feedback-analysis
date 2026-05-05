@@ -4,9 +4,6 @@ import pandas as pd
 import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
-# Добавьте эти импорты в раздел существующих импортов
-import plotly.express as px
-import plotly.graph_objects as go
 
 
 def local_css(file_name):
@@ -275,39 +272,32 @@ elif st.session_state.page == "Аналитика":
                     sentiment_colors = {1: '#f44336', 2: '#4caf50', 0: '#9e9e9e'}
 
                     sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
-                    sentiment_counts['color'] = sentiment_counts['sentiment'].map(sentiment_colors)
 
-                    # ПРАВИЛЬНОЕ ПОСТРОЕНИЕ ГРАФИКА ДЛЯ STREAMLIT
-                    fig = px.pie(
-                        sentiment_counts,
-                        values='count',
-                        names='label',
-                        color='sentiment',
-                        color_discrete_map=sentiment_colors,
-                        hole=0.4
-                    )
+                    # ПОДГОТОВКА ДАННЫХ ДЛЯ ВСТРОЕННОГО ГРАФИКА
+                    # Создаем DataFrame для pie chart
+                    pie_data = pd.DataFrame({
+                        'Категория': sentiment_counts['label'],
+                        'Количество': sentiment_counts['count']
+                    })
 
-                    fig.update_traces(
-                        textposition='inside',
-                        textinfo='percent+label',
-                        hovertemplate="%{label}: %{value} отзывов<extra></extra>"
-                    )
-
-                    fig.update_layout(
-                        margin=dict(t=0, b=0, l=0, r=0),
-                        showlegend=False,
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        height=300  # Фиксируем высоту для лучшего отображения в колонке
-                    )
-
-                    # ОСНОВНОЕ ИЗМЕНЕНИЕ: ИСПОЛЬЗУЕМ st.plotly_chart СОГЛАСНО ДОКУМЕНТАЦИИ
-                    st.plotly_chart(
-                        fig,
-                        use_container_width=True,
-                        theme="streamlit",  # Используем тему Streamlit по умолчанию
-                        config={'displayModeBar': False}  # Скрываем панель инструментов
-                    )
+                    # Используем st.pie_chart (доступен в новых версиях Streamlit)
+                    # Если у вас старая версия Streamlit, используем альтернативный метод
+                    try:
+                        # Новые версии Streamlit (>=1.24) поддерживают st.pie_chart
+                        st.pie_chart(
+                            data=pie_data,
+                            names='Категория',
+                            values='Количество',
+                            color_discrete_map=sentiment_colors,
+                            use_container_width=True
+                        )
+                    except AttributeError:
+                        # Старые версии Streamlit - используем st.bar_chart как альтернативу
+                        st.bar_chart(
+                            data=pie_data.set_index('Категория'),
+                            use_container_width=True,
+                            height=300
+                        )
 
                     # Добавляем легенду под графиком
                     st.markdown("""
@@ -379,7 +369,7 @@ elif st.session_state.page == "Аналитика":
                                 del st.session_state.content_generated
                             st.rerun()
 
-            # 3. Исходные отзывы (оставляем как есть)
+            # 3. Исходные отзывы
             with st.expander("🔍 Подробная статистика отзывов"):
                 if reviews_df is not None and not reviews_df.empty:
                     # Применяем цветовое форматирование к тональности
