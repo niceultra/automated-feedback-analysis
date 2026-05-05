@@ -46,6 +46,55 @@ DB_USER = st.secrets["DB_USER"]
 DB_PASS = st.secrets["DB_PASS"]
 
 
+
+# --- ФУНКЦИИ БАЗЫ ДАННЫХ ---
+def get_db_connection():
+    return psycopg2.connect(
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
+        port=6432,
+        sslmode='require'
+    )
+
+
+def get_product_analytics(nm_id):
+    """Получает и текст резюме, и HTML-код графика"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT summary_text, chart_html FROM product_summary WHERE nm_id = %s", (str(nm_id),))
+        result = cursor.fetchone()
+        conn.close()
+        return result if result else (None, None)
+    except:
+        return None, None
+
+
+def get_reviews(nm_id):
+    try:
+        conn = get_db_connection()
+        # Выбираем текст, тональность и уверенность модели
+        query = f"SELECT review_text, sentiment, confidence FROM reviews WHERE nm_id = '{nm_id}'"
+        df = pd.read_sql(query, conn)
+        conn.close()
+        return df
+    except:
+        return None
+
+
+def get_all_products():
+    try:
+        conn = get_db_connection()
+        # Используем обновленные названия колонок: category_name
+        df = pd.read_sql("SELECT nm_id, category_name, product_name, product_url FROM products", conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
+
+
 def extract_strengths_weaknesses(summary_text):
     """
     Извлекает сильные и слабые стороны из текста аналитики
@@ -95,55 +144,6 @@ def extract_strengths_weaknesses(summary_text):
         st.error(f"Ошибка при извлечении данных: {str(e)}")
 
     return strengths, weaknesses
-
-
-# --- ФУНКЦИИ БАЗЫ ДАННЫХ ---
-def get_db_connection():
-    return psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        port=6432,
-        sslmode='require'
-    )
-
-
-def get_product_analytics(nm_id):
-    """Получает и текст резюме, и HTML-код графика"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT summary_text, chart_html FROM product_summary WHERE nm_id = %s", (str(nm_id),))
-        result = cursor.fetchone()
-        conn.close()
-        return result if result else (None, None)
-    except:
-        return None, None
-
-
-def get_reviews(nm_id):
-    try:
-        conn = get_db_connection()
-        # Выбираем текст, тональность и уверенность модели
-        query = f"SELECT review_text, sentiment, confidence FROM reviews WHERE nm_id = '{nm_id}'"
-        df = pd.read_sql(query, conn)
-        conn.close()
-        return df
-    except:
-        return None
-
-
-def get_all_products():
-    try:
-        conn = get_db_connection()
-        # Используем обновленные названия колонок: category_name
-        df = pd.read_sql("SELECT nm_id, category_name, product_name, product_url FROM products", conn)
-        conn.close()
-        return df
-    except:
-        return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
-
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
     # Соответствие согласно Ledger: 1-neg, 2-pos, 0-neutral
