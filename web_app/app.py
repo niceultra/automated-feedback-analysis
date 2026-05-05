@@ -364,20 +364,38 @@ elif st.session_state.page == "Аналитика":
                     sentiment_counts = reviews_df['sentiment'].value_counts().reset_index()
                     sentiment_counts.columns = ['sentiment', 'count']
 
-                    # Преобразуем числовые значения в понятные названия
-                    sentiment_labels = {1: 'Негативные', 2: 'Позитивные', 0: 'Нейтральные'}
-                    sentiment_colors = {1: '#f44336', 2: '#4caf50', 0: '#9e9e9e'}
+                    # Определяем правильные метки и цвета
+                    sentiment_labels = {0: 'Нейтральные', 1: 'Негативные', 2: 'Позитивные'}
+                    sentiment_colors = {0: '#9e9e9e', 1: '#f44336', 2: '#4caf50'}
 
+                    # Добавляем метки
                     sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
-                    sentiment_counts['color'] = sentiment_counts['sentiment'].map(sentiment_colors)
 
-                    # Создаем круговую диаграмму с помощью plotly
+                    # ГАРАНТИРУЕМ НАЛИЧИЕ ВСЕХ ТРЕХ КАТЕГОРИЙ
+                    # Если какой-то категории нет, добавляем ее с нулевым значением
+                    for sentiment in [0, 1, 2]:
+                        if sentiment not in sentiment_counts['sentiment'].values:
+                            new_row = pd.DataFrame({
+                                'sentiment': [sentiment],
+                                'count': [0],
+                                'label': [sentiment_labels[sentiment]]
+                            })
+                            sentiment_counts = pd.concat([sentiment_counts, new_row], ignore_index=True)
+
+                    # СОЗДАЕМ ПРАВИЛЬНОЕ СОПОСТАВЛЕНИЕ ЦВЕТОВ С МЕТКАМИ
+                    label_colors = {
+                        'Нейтральные': '#9e9e9e',
+                        'Негативные': '#f44336',
+                        'Позитивные': '#4caf50'
+                    }
+
+                    # Создаем круговую диаграмму
                     fig = px.pie(
                         sentiment_counts,
                         values='count',
                         names='label',
                         color='label',
-                        color_discrete_map=sentiment_colors,
+                        color_discrete_map=label_colors,
                         hole=0.4
                     )
 
@@ -391,10 +409,11 @@ elif st.session_state.page == "Аналитика":
                         showlegend=False,
                         margin=dict(t=0, b=0, l=0, r=0),
                         paper_bgcolor='rgba(0,0,0,0)',
-                        plot_bgcolor='rgba(0,0,0,0)'
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        height=300
                     )
 
-                    # Используем st.plotly_chart
+                    # Отображаем в Streamlit
                     st.plotly_chart(
                         fig,
                         use_container_width=True,
