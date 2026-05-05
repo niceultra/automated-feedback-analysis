@@ -351,38 +351,32 @@ elif st.session_state.page == "Аналитика":
             col_chart, col_text = st.columns([1, 2])
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
-            # В начале файла
-            import plotly.express as px
-
-            # В левой колонке с графиком
             with col_chart:
                 st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
 
                 reviews_df = get_reviews(current_sku)
+
                 if reviews_df is not None and not reviews_df.empty:
+                    # ПРИНУДИТЕЛЬНОЕ ИСПРАВЛЕНИЕ:
+                    # 1. Убираем возможные пустые значения в sentiment
+                    reviews_df = reviews_df.dropna(subset=['sentiment'])
+                    # 2. Приводим к типу int (чтобы 2.0 или "2" стали просто 2)
+                    reviews_df['sentiment'] = reviews_df['sentiment'].astype(int)
+
                     # Подсчитываем тональность
                     sentiment_counts = reviews_df['sentiment'].value_counts().reset_index()
                     sentiment_counts.columns = ['sentiment', 'count']
 
-                    # Определяем правильные метки и цвета
+                    # Словарь меток
                     sentiment_labels = {0: 'Нейтральные', 1: 'Негативные', 2: 'Позитивные'}
-                    sentiment_colors = {0: '#9e9e9e', 1: '#f44336', 2: '#4caf50'}
 
-                    # Добавляем метки
+                    # Добавляем текстовую колонку 'label' на основе числового sentiment
                     sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
 
-                    # ГАРАНТИРУЕМ НАЛИЧИЕ ВСЕХ ТРЕХ КАТЕГОРИЙ
-                    # Если какой-то категории нет, добавляем ее с нулевым значением
-                    for sentiment in [0, 1, 2]:
-                        if sentiment not in sentiment_counts['sentiment'].values:
-                            new_row = pd.DataFrame({
-                                'sentiment': [sentiment],
-                                'count': [0],
-                                'label': [sentiment_labels[sentiment]]
-                            })
-                            sentiment_counts = pd.concat([sentiment_counts, new_row], ignore_index=True)
+                    # Если после map появились NaN (например, если в базе было число 3), удаляем их
+                    sentiment_counts = sentiment_counts.dropna(subset=['label'])
 
-                    # СОЗДАЕМ ПРАВИЛЬНОЕ СОПОСТАВЛЕНИЕ ЦВЕТОВ С МЕТКАМИ
+                    # Цветовая карта
                     label_colors = {
                         'Нейтральные': '#9e9e9e',
                         'Негативные': '#f44336',
@@ -393,8 +387,8 @@ elif st.session_state.page == "Аналитика":
                     fig = px.pie(
                         sentiment_counts,
                         values='count',
-                        names='label',
-                        color='label',
+                        names='label',  # Используем текстовую колонку для имен
+                        color='label',  # И для цвета
                         color_discrete_map=label_colors,
                         hole=0.4
                     )
@@ -402,34 +396,29 @@ elif st.session_state.page == "Аналитика":
                     fig.update_traces(
                         textposition='inside',
                         textinfo='percent+label',
-                        hovertemplate="%{label}: %{value} отзывов<extra></extra>"
+                        hovertemplate="<b>%{label}</b><br>Количество: %{value}<br>Доля: %{percent}<extra></extra>"
                     )
 
                     fig.update_layout(
                         showlegend=False,
-                        margin=dict(t=0, b=0, l=0, r=0),
+                        margin=dict(t=10, b=10, l=10, r=10),
                         paper_bgcolor='rgba(0,0,0,0)',
                         plot_bgcolor='rgba(0,0,0,0)',
                         height=300
                     )
 
-                    # Отображаем в Streamlit
-                    st.plotly_chart(
-                        fig,
-                        use_container_width=True,
-                        config={'displayModeBar': False}
-                    )
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
 
-                    # Добавляем легенду под графиком
-                    st.markdown("""
-                    <div style="display: flex; justify-content: center; gap: 15px; margin-top: -15px;">
-                        <span style="color: #f44336;">● Негативные</span>
-                        <span style="color: #4caf50;">● Позитивные</span>
-                        <span style="color: #9e9e9e;">● Нейтральные</span>
+                    # Кастомная легенда
+                    st.markdown(f"""
+                    <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; font-size: 0.8em;">
+                        <span style="color: #4caf50;">● Позитив</span>
+                        <span style="color: #f44336;">● Негатив</span>
+                        <span style="color: #9e9e9e;">● Нейтрально</span>
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.info("Нет данных для построения графика")
+                    st.info("Нет данных для анализа")
 
             # --- ПРАВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
             with col_text:
