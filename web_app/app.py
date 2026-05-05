@@ -4,6 +4,7 @@ import pandas as pd
 import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
+import plotly.express as px
 
 
 def local_css(file_name):
