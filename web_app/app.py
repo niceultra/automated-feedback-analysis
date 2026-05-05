@@ -348,60 +348,86 @@ elif st.session_state.page == "Аналитика":
 
     if st.session_state.get('current_sku'):
         current_sku = st.session_state.current_sku
-        summary_text, _ = get_product_analytics(current_sku)
 
-        if summary_text:
+        # Получаем полную аналитику из БД
+        product_summary = get_product_summary(current_sku)
+
+        if product_summary and product_summary['summary_text']:
+            summary_text = product_summary['summary_text']
             st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
             col_chart, col_text = st.columns([1, 2])
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
+            # В начале файла
+            import plotly.express as px
+
+            # В левой колонке с графиком
             with col_chart:
                 st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
 
-                # ИЗВЛЕКАЕМ СТАТИСТИКУ ИЗ summary_text
-                stats = extract_statistics_from_summary(summary_text)
+                reviews_df = get_reviews(current_sku)
+                if reviews_df is not None and not reviews_df.empty:
+                    # Подсчитываем тональность
+                    sentiment_counts = reviews_df['sentiment'].value_counts().reset_index()
+                    sentiment_counts.columns = ['sentiment', 'count']
 
-                # Проверяем, есть ли данные
-                total_reviews = sum(stats.values())
-                if total_reviews > 0:
-                    # Создаем данные для графика
-                    labels = list(stats.keys())
-                    sizes = list(stats.values())
+                    # Определяем правильные метки и цвета
+                    sentiment_labels = {0: 'Нейтральные', 1: 'Негативные', 2: 'Позитивные'}
+                    sentiment_colors = {0: '#9e9e9e', 1: '#f44336', 2: '#4caf50'}
 
-                    # Цвета для категорий
-                    colors = ['#4caf50', '#f44336', '#9e9e9e']
+                    # Добавляем метки
+                    sentiment_counts['label'] = sentiment_counts['sentiment'].map(sentiment_labels)
 
-                    # Создаем круговую диаграмму с помощью matplotlib
-                    import matplotlib.pyplot as plt
-                    from matplotlib import font_manager
+                    # ГАРАНТИРУЕМ НАЛИЧИЕ ВСЕХ ТРЕХ КАТЕГОРИЙ
+                    # Если какой-то категории нет, добавляем ее с нулевым значением
+                    for sentiment in [0, 1, 2]:
+                        if sentiment not in sentiment_counts['sentiment'].values:
+                            new_row = pd.DataFrame({
+                                'sentiment': [sentiment],
+                                'count': [0],
+                                'label': [sentiment_labels[sentiment]]
+                            })
+                            sentiment_counts = pd.concat([sentiment_counts, new_row], ignore_index=True)
 
-                    # Создаем фигуру с прозрачным фоном
-                    fig, ax = plt.subplots(figsize=(6, 4))
-                    fig.patch.set_alpha(0)
-                    ax.set_facecolor('none')
+                    # СОЗДАЕМ ПРАВИЛЬНОЕ СОПОСТАВЛЕНИЕ ЦВЕТОВ С МЕТКАМИ
+                    label_colors = {
+                        'Нейтральные': '#9e9e9e',
+                        'Негативные': '#f44336',
+                        'Позитивные': '#4caf50'
+                    }
 
-                    # Строим круговую диаграмму
-                    wedges, texts, autotexts = ax.pie(
-                        sizes,
-                        labels=labels,
-                        colors=colors,
-                        autopct='%1.1f%%',
-                        startangle=90,
-                        textprops={'color': 'white', 'fontsize': 10, 'weight': 'bold'}
+                    # Создаем круговую диаграмму
+                    fig = px.pie(
+                        sentiment_counts,
+                        values='count',
+                        names='label',
+                        color='label',
+                        color_discrete_map=label_colors,
+                        hole=0.4
                     )
 
-                    # Делаем диаграмму круглой
-                    ax.axis('equal')
+                    fig.update_traces(
+                        textposition='inside',
+                        textinfo='percent+label',
+                        hovertemplate="%{label}: %{value} отзывов<extra></extra>"
+                    )
 
-                    # Устанавливаем белый цвет для текста процентов
-                    for autotext in autotexts:
-                        autotext.set_color('white')
-                        autotext.set_fontweight('bold')
+                    fig.update_layout(
+                        showlegend=False,
+                        margin=dict(t=0, b=0, l=0, r=0),
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        height=300
+                    )
 
                     # Отображаем в Streamlit
-                    st.pyplot(fig)
+                    st.plotly_chart(
+                        fig,
+                        use_container_width=True,
+                        config={'displayModeBar': False}
+                    )
 
                     # Добавляем легенду под графиком
                     st.markdown("""
@@ -412,7 +438,7 @@ elif st.session_state.page == "Аналитика":
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    st.warning("Нет данных для построения графика")
+                    st.info("Нет данных для построения графика")
 
             # --- ПРАВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
             with col_text:
@@ -475,7 +501,6 @@ elif st.session_state.page == "Аналитика":
 
             # 3. Исходные отзывы
             with st.expander("🔍 Подробная статистика отзывов"):
-                reviews_df = get_reviews(current_sku)
                 if reviews_df is not None and not reviews_df.empty:
                     # Применяем цветовое форматирование к тональности
                     styled_reviews = reviews_df.style.map(color_sentiment, subset=['sentiment'])
