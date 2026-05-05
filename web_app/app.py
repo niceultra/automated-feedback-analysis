@@ -5,7 +5,7 @@ import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
 import plotly.express as px
-import google.generativeai as genai
+
 
 
 def local_css(file_name):
