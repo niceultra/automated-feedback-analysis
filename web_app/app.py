@@ -62,42 +62,42 @@ def get_db_connection():
 
 
 def generate_marketing_content(strengths, weaknesses):
-    from google import genai  # Новый импорт
+    """
+    Генерирует маркетинговый отчет на основе списков плюсов и минусов.
+    """
+    # Настройка API ключа (убедитесь, что добавили его в .streamlit/secrets.toml)
+    if "GEMINI_API_KEY" not in st.secrets:
+        return "Ошибка: Не найден GEMINI_API_KEY в секретах приложения."
 
-    def generate_marketing_content(strengths, weaknesses):
-        if "GEMINI_API_KEY" not in st.secrets:
-            return "Ошибка: Не найден GEMINI_API_KEY в секретах приложения."
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    # Формируем запрос для нейросети
+    prompt = f"""
+    Ты — ведущий маркетинговый аналитик. На основе данных анализа отзывов составь стратегический отчет для продавца на маркетплейсе.
 
-        try:
-            # Инициализация клиента по новому стандарту
-            client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    СИЛЬНЫЕ СТОРОНЫ ТОВАРА:
+    {', '.join(strengths) if strengths else 'Не выявлено'}
 
-            prompt = f"""
-            Ты — ведущий маркетинговый аналитик. На основе данных анализа отзывов составь стратегический отчет для продавца на маркетплейсе.
+    СЛАБЫЕ СТОРОНЫ ТОВАРА:
+    {', '.join(weaknesses) if weaknesses else 'Не выявлено'}
 
-            СИЛЬНЫЕ СТОРОНЫ ТОВАРА:
-            {', '.join(strengths) if strengths else 'Не выявлено'}
+    Твоя задача составить отчет по следующим пунктам:
+    1. Уникальное торговое предложение (УТП) — на чем сделать акцент в рекламе.
+    2. Рекомендации по улучшению продукта — как устранить негатив.
+    3. Идеи для инфографики — какие буллиты вынести на главные фото.
+    4. Тональность ответов — как общаться с покупателями в отзывах.
 
-            СЛАБЫЕ СТОРОНЫ ТОВАРА:
-            {', '.join(weaknesses) if weaknesses else 'Не выявлено'}
+    Пиши профессионально, лаконично и на русском языке. Используй Markdown для оформления.
+    """
 
-            Твоя задача составить отчет по следующим пунктам:
-            1. Уникальное торговое предложение (УТП).
-            2. Рекомендации по улучшению продукта.
-            3. Идеи для инфографики.
-            4. Тональность ответов.
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Произошла ошибка при обращении к Gemini AI: {str(e)}"
 
-            Пиши профессионально на русском языке в формате Markdown.
-            """
-
-            # Новый метод вызова генерации
-            response = client.models.generate_content(
-                model='gemini-2.0-flash',  # Используем новейшую модель 2.0
-                contents=prompt
-            )
-            return response.text
-        except Exception as e:
-            return f"Произошла ошибка при обращении к Gemini AI (New SDK): {str(e)}"
+    available_models = [m.name for m in genai.list_models()]
+    st.write("Доступные модели:", available_models)
 
 
 def get_product_analytics(nm_id):
