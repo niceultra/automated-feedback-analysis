@@ -96,6 +96,9 @@ def generate_marketing_content(strengths, weaknesses):
     except Exception as e:
         return f"Произошла ошибка при обращении к Gemini AI: {str(e)}"
 
+    available_models = [m.name for m in genai.list_models()]
+    st.write("Доступные модели:", available_models)
+
 
 def get_product_analytics(nm_id):
     """Получает и текст резюме, и HTML-код графика"""
