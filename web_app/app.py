@@ -4,6 +4,8 @@ import pandas as pd
 import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
+import plotly.express as px
+import google.generativeai as genai
 
 
 def local_css(file_name):
@@ -275,7 +277,7 @@ elif st.session_state.page == "Аналитика":
                     sentiment_counts['color'] = sentiment_counts['sentiment'].map(sentiment_colors)
 
                     # Строим круговую диаграмму с помощью Plotly (более красивая, чем встроенные Streamlit)
-                    import plotly.express as px
+
 
                     fig = px.pie(
                         sentiment_counts,
