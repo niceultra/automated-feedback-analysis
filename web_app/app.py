@@ -27,7 +27,7 @@ local_css("style.css")
 img = Image.open("./images/logo.png")
 # 2. Передаем объект изображения в конфигурацию
 st.set_page_config(
-    page_title="InsightBot • Умная аналитика отзывов",
+    page_title="ИнСайт Бот • Умная аналитика отзывов",
     page_icon=img,
     layout="wide",
     initial_sidebar_state="expanded"
@@ -251,7 +251,7 @@ with st.sidebar:
         st.markdown(
             """
             <h1 style='margin-top: 10px; margin-bottom: 0; padding: 0;'>
-                Insight<span style='color: #28a745;'>Bot</span>
+                ИнСайт<span style='color: #28a745;'>Бот</span>
             </h1>
             """,
             unsafe_allow_html=True
