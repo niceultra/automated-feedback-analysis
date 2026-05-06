@@ -251,7 +251,7 @@ with st.sidebar:
         st.markdown(
             """
             <h1 style='margin-top: 10px; margin-bottom: 0; padding: 0;'>
-                ИнСайт<span style='color: #28a745;'>Бот</span>
+                ИнСайт<span style='color: #28a745;'> Бот</span>
             </h1>
             """,
             unsafe_allow_html=True
