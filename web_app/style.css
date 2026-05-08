@@ -184,38 +184,75 @@ div[data-testid="stStatusWidget"] {
 
     z-index: 999999 !important;
 
-    background: rgba(17, 24, 39, 0.92) !important;
-    color: #ffffff !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
 
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    border-radius: 999px !important;
+    padding: 18px 24px !important;
+    min-width: 130px !important;
+    min-height: 92px !important;
 
-    padding: 12px 18px !important;
-    min-width: 70px !important;
-    min-height: 50px !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(17, 24, 39, 0.10) !important;
 
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28) !important;
-    backdrop-filter: blur(8px) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
+    background: rgba(255, 255, 255, 0.92) !important;
+    color: #1f2937 !important;
+
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
 
     opacity: 1 !important;
     visibility: visible !important;
 }
 
-/* Белый цвет для всего содержимого */
+/* Надпись под иконкой */
+div[data-testid="stStatusWidget"]::after {
+    content: "Загрузка";
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1f2937;
+    line-height: 1.2;
+}
+
+/* Цвет внутренних элементов */
 div[data-testid="stStatusWidget"] * {
-    color: #ffffff !important;
+    color: #1f2937 !important;
 }
 
-/* Увеличим иконку */
+/* Увеличиваем иконку */
 div[data-testid="stStatusWidget"] svg {
-    width: 28px !important;
-    height: 28px !important;
+    width: 30px !important;
+    height: 30px !important;
 }
 
-/* Кнопка stop, если появляется */
+/* Кнопка Stop, если появляется */
 div[data-testid="stStatusWidget"] button {
-    color: #ffffff !important;
+    color: #1f2937 !important;
     background: transparent !important;
     border: none !important;
+}
+
+/* ===== АДАПТАЦИЯ ДЛЯ ТЕМНОЙ ТЕМЫ ===== */
+
+.stApp.stAppDark div[data-testid="stStatusWidget"] {
+    background: rgba(17, 24, 39, 0.92) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35) !important;
+}
+
+.stApp.stAppDark div[data-testid="stStatusWidget"]::after {
+    color: #ffffff !important;
+}
+
+.stApp.stAppDark div[data-testid="stStatusWidget"] * {
+    color: #ffffff !important;
+}
+
+.stApp.stAppDark div[data-testid="stStatusWidget"] button {
+    color: #ffffff !important;
 }
