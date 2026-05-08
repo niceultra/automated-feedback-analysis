@@ -593,11 +593,6 @@ elif st.session_state.page == "Аналитика":
 
                 # Отображаем результат, если он уже сгенерирован
                 if 'content_generated' in st.session_state and st.session_state.content_generated:
-                    st.markdown(
-                        '<div class="result-box" style="margin-top: 20px;">',
-                        unsafe_allow_html=True
-                    )
-                    st.markdown("### 📈 Стратегический маркетинговый отчет")
                     st.markdown(st.session_state.marketing_content)
                     st.markdown('</div>', unsafe_allow_html=True)
 
