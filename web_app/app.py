@@ -475,7 +475,7 @@ elif st.session_state.page == "Аналитика":
 
         if product_summary and product_summary['summary_text']:
             summary_text = product_summary['summary_text']
-            st.markdown(f"#### Отчет по товару: {current_sku}")
+            st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
             col_text, col_chart = st.columns([2, 1])
