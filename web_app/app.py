@@ -69,6 +69,7 @@ def generate_marketing_content(strengths, weaknesses):
     """
     Генерирует маркетинговый отчет с использованием GigaChat API
     """
+
     # Проверка наличия необходимых секретов
     required_secrets = ["GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"]
     missing_secrets = [s for s in required_secrets if s not in st.secrets]
