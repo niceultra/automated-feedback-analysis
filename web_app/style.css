@@ -158,3 +158,19 @@
     padding-left: 0.85rem !important;
 }
 
+/* Критически важно: переопределяем стили внутренних элементов кнопки */
+[data-testid="stSidebar"] div.stButton > button > div,
+[data-testid="stSidebar"] div.stButton > button > span {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+/* Для текста внутри кнопки */
+[data-testid="stSidebar"] div.stButton > button p {
+    margin-bottom: 0 !important;
+    text-align: left !important;
+    width: 100% !important;
+}
+
