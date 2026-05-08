@@ -482,7 +482,7 @@ elif st.session_state.page == "Аналитика":
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
             with col_chart:
-                st.markdown('<div style="text-align: center; width: 100%; margin: 0 auto;">Распределение мнений</div>', unsafe_allow_html=True)
+                st.markdown('<div style="text-align: center; width: 100%; margin: 0 auto;">Распределение мнений по тональности</div>', unsafe_allow_html=True)
 
                 reviews_df = get_reviews(current_sku)
 
