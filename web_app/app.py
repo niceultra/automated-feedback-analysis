@@ -475,7 +475,19 @@ elif st.session_state.page == "Аналитика":
 
         if product_summary and product_summary['summary_text']:
             summary_text = product_summary['summary_text']
-            st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
+            product_name = "Неизвестный товар"
+            if not product_df.empty:
+                product_row = product_df[product_df['nm_id'] == current_sku]
+                if not product_row.empty:
+                    product_name = product_row['product_name'].values[0]
+                else:
+                    # Попробуем найти через строковое сравнение (на случай если типы не совпадают)
+                    product_row = product_df[product_df['nm_id'].astype(str) == str(current_sku)]
+                    if not product_row.empty:
+                        product_name = product_row['product_name'].values[0]
+
+            st.markdown(f"#### 📊 Отчет по товару: {product_name}")
+
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
             col_text, col_chart = st.columns([2, 1])
