@@ -79,8 +79,6 @@ def generate_marketing_content(strengths, weaknesses):
     client_id = st.secrets["GIGACHAT_CLIENT_ID"]
     client_secret = st.secrets["GIGACHAT_CLIENT_SECRET"]
 
-    # КРИТИЧЕСКИ ВАЖНО: Правильная подготовка Basic Authorization
-    # Должно быть client_id:client_secret в Base64
     auth_string = f"{client_id}:{client_secret}"
 
     # Правильное Base64 кодирование (убираем b' и trailing = если нужно)
@@ -477,14 +475,14 @@ elif st.session_state.page == "Аналитика":
 
         if product_summary and product_summary['summary_text']:
             summary_text = product_summary['summary_text']
-            st.markdown(f"#### 📊 Отчет по товару: {current_sku}")
+            st.markdown(f"#### Отчет по товару: {current_sku}")
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
             col_text, col_chart = st.columns([2, 1])
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
             with col_chart:
-                st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
+                st.markdown('<div style="text-align: center; width: 100%; margin: 0 auto;">📈 Распределение мнений</div>', unsafe_allow_html=True)
 
                 reviews_df = get_reviews(current_sku)
 
@@ -573,7 +571,7 @@ elif st.session_state.page == "Аналитика":
                                  type="primary",
                                  icon=":material/rocket_launch:",
                                  use_container_width=True):
-                        with st.spinner("Генерация контента через Google Gemini... Это займет 15-20 секунд"):
+                        with st.spinner("Генерация контента ... Это займет 15-20 секунд"):
                             # Генерируем контент
                             marketing_content = generate_marketing_content(strengths, weaknesses)
 
@@ -583,7 +581,6 @@ elif st.session_state.page == "Аналитика":
 
                 # Отображаем результат, если он уже сгенерирован
                 if 'content_generated' in st.session_state and st.session_state.content_generated:
-                    st.markdown("### 📈 Стратегический маркетинговый отчет")
                     st.markdown(st.session_state.marketing_content)
                     st.markdown('</div>', unsafe_allow_html=True)
 
