@@ -7,7 +7,12 @@ import plotly.express as px
 import requests
 import uuid
 import time
-from requests.exceptions import SSLError
+import io
+import numpy as np
+import torch
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from psycopg2.extras import execute_batch
+from requests.exceptions import SSLError, ConnectionError, Timeout, RequestException
 
 
 def local_css(file_name):
@@ -378,6 +383,400 @@ def color_sentiment(val):
     return 'color: #9e9e9e;'
 
 
+# --- BERT-МОДЕЛЬ ДЛЯ АНАЛИЗА ЗАГРУЖЕННЫХ ОТЗЫВОВ ---
+BERT_MODEL_ID = "fsed/bert-review-sentiment-classifier"
+
+SENTIMENT_LABELS = {
+    0: "Нейтральные",
+    1: "Негативные",
+    2: "Позитивные"
+}
+
+
+@st.cache_resource(show_spinner=False)
+def load_bert_review_model():
+    """
+    Загружает дообученную BERT-модель с Hugging Face.
+    Кэширование нужно, чтобы модель не скачивалась и не загружалась заново при каждом действии на сайте.
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    tokenizer = AutoTokenizer.from_pretrained(BERT_MODEL_ID)
+    model = AutoModelForSequenceClassification.from_pretrained(BERT_MODEL_ID).to(device)
+    model.eval()
+
+    return tokenizer, model, device
+
+
+def predict_batch(texts, max_length=256, batch_size=16):
+    """
+    Пакетно анализирует список отзывов через BERT.
+
+    Возвращает:
+    preds: предсказанные классы 0/1/2
+    probs: вероятности по классам
+    """
+    tokenizer, model, device = load_bert_review_model()
+
+    if isinstance(texts, str):
+        texts = [texts]
+
+    texts = [str(t) if pd.notna(t) else "" for t in texts]
+
+    all_preds = []
+    all_probs = []
+
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i + batch_size]
+
+        enc = tokenizer(
+            batch_texts,
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt"
+        ).to(device)
+
+        with torch.no_grad():
+            outputs = model(**enc)
+            batch_probs = torch.softmax(outputs.logits, dim=1).detach().cpu().numpy()
+            batch_preds = np.argmax(batch_probs, axis=1)
+
+        all_preds.extend(batch_preds)
+        all_probs.extend(batch_probs)
+
+    return np.array(all_preds), np.array(all_probs)
+
+
+def read_uploaded_reviews_file(uploaded_file):
+    """
+    Читает CSV или XLSX из st.file_uploader.
+    Для CSV пробует сначала разделитель ;, затем обычное чтение.
+    """
+    file_name = uploaded_file.name.lower()
+
+    if file_name.endswith(".xlsx"):
+        return pd.read_excel(uploaded_file)
+
+    if file_name.endswith(".csv"):
+        uploaded_file.seek(0)
+        try:
+            return pd.read_csv(uploaded_file, sep=";")
+        except Exception:
+            uploaded_file.seek(0)
+            return pd.read_csv(uploaded_file)
+
+    raise ValueError("Поддерживаются только файлы CSV и XLSX.")
+
+
+def find_first_column(df, candidates):
+    """
+    Ищет первую подходящую колонку в загруженном файле.
+    Сравнение идет без учета регистра.
+    """
+    columns_map = {str(col).strip().lower(): col for col in df.columns}
+
+    for candidate in candidates:
+        key = candidate.strip().lower()
+        if key in columns_map:
+            return columns_map[key]
+
+    return None
+
+
+def get_first_not_empty_value(df, columns, default_value):
+    """
+    Берет первое непустое значение из списка возможных колонок.
+    """
+    for col in columns:
+        if col in df.columns:
+            values = df[col].dropna().astype(str)
+            values = values[values.str.strip() != ""]
+            if not values.empty:
+                return values.iloc[0].strip()
+
+    return default_value
+
+
+def clean_review_text(text):
+    text = "" if pd.isna(text) else str(text)
+    return " ".join(text.replace("\n", " ").replace("\r", " ").split()).strip()
+
+
+def unique_texts_by_order(texts, limit=5):
+    """
+    Убирает дубликаты, пустые и слишком короткие фразы.
+    """
+    result = []
+    seen = set()
+
+    for text in texts:
+        clean = clean_review_text(text)
+
+        if len(clean) < 15:
+            continue
+
+        key = clean.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        result.append(clean)
+
+        if len(result) >= limit:
+            break
+
+    return result
+
+
+def pros_cons_from_predictions(df_product, text_col, top_k=5):
+    """
+    Выделяет плюсы и минусы на основе уверенных предсказаний BERT.
+    Быстрее и стабильнее для Streamlit, чем SHAP-анализ на каждом загруженном файле.
+    """
+    positive_df = df_product[df_product["sentiment"] == 2].copy()
+    negative_df = df_product[df_product["sentiment"] == 1].copy()
+
+    positive_df = positive_df.sort_values("confidence", ascending=False)
+    negative_df = negative_df.sort_values("confidence", ascending=False)
+
+    pros = unique_texts_by_order(positive_df[text_col].tolist(), limit=top_k)
+    cons = unique_texts_by_order(negative_df[text_col].tolist(), limit=top_k)
+
+    if not pros:
+        pros = ["Недостаточно позитивных отзывов для выделения устойчивых преимуществ."]
+
+    if not cons:
+        cons = ["Явных повторяющихся негативных замечаний не выявлено."]
+
+    return pros, cons
+
+
+def build_summary_text(product_name, stats, pros, cons):
+    """
+    Формирует текстовую аналитику в формате, который уже понимает текущая страница аналитики.
+    Важно сохранить заголовки КЛЮЧЕВЫЕ ПЛЮСЫ и КЛЮЧЕВЫЕ МИНУСЫ.
+    """
+    total = max(stats["total_reviews"], 1)
+
+    lines = [
+        f"АНАЛИТИКА ПО ТОВАРУ: {product_name}",
+        "",
+        f"Всего отзывов: {stats['total_reviews']}",
+        f"Позитивных: {stats['positive']} ({stats['positive'] / total:.1%})",
+        f"Негативных: {stats['negative']} ({stats['negative'] / total:.1%})",
+        f"Нейтральных: {stats['neutral']} ({stats['neutral'] / total:.1%})",
+        "",
+        "КЛЮЧЕВЫЕ ПЛЮСЫ:"
+    ]
+
+    for i, pro in enumerate(pros, 1):
+        lines.append(f"{i}. {pro}")
+
+    lines.append("")
+    lines.append("КЛЮЧЕВЫЕ МИНУСЫ:")
+
+    for i, con in enumerate(cons, 1):
+        lines.append(f"{i}. {con}")
+
+    return "\n".join(lines)
+
+
+def analyze_uploaded_reviews_dataframe(df):
+    """
+    Анализирует загруженный файл с отзывами.
+    Ожидаемые обязательные колонки:
+    - nmId / nm_id / артикул
+    - text / review_text / отзыв
+    """
+    if df is None or df.empty:
+        raise ValueError("Файл пустой или не удалось прочитать данные.")
+
+    nm_col = find_first_column(df, ["nmId", "nm_id", "nm", "артикул", "Артикул", "ID"])
+    text_col = find_first_column(df, ["text", "review_text", "review", "отзыв", "отзывы", "текст", "Текст отзыва", "Комментарий", "comment"])
+
+    if nm_col is None or text_col is None:
+        raise ValueError(
+            "В файле должны быть колонки с артикулом и текстом отзыва. "
+            "Подойдут названия: nmId + text, nm_id + review_text, Артикул + Отзыв."
+        )
+
+    df = df.copy()
+    df[nm_col] = df[nm_col].astype(str).str.strip()
+    df[text_col] = df[text_col].apply(clean_review_text)
+
+    df = df[(df[nm_col] != "") & (df[text_col] != "")]
+    if df.empty:
+        raise ValueError("После очистки не осталось строк с артикулом и текстом отзыва.")
+
+    analyzed_products = []
+    analyzed_reviews = []
+
+    product_name_candidates = ["product_name", "name", "title", "Наименование", "Название", "Товар", "subjectName"]
+    category_candidates = ["category_name", "category", "Категория", "subjectParentName"]
+    url_candidates = ["product_url", "url", "Ссылка", "link"]
+
+    for nm_id, df_product_raw in df.groupby(nm_col):
+        df_product = df_product_raw.copy()
+
+        preds, probs = predict_batch(df_product[text_col].tolist(), batch_size=16)
+
+        df_product["sentiment"] = preds.astype(int)
+        df_product["confidence"] = [float(probs[i][preds[i]]) for i in range(len(preds))]
+        df_product["prob_neutral"] = probs[:, 0]
+        df_product["prob_negative"] = probs[:, 1]
+        df_product["prob_positive"] = probs[:, 2]
+        df_product["sentiment_label"] = df_product["sentiment"].map(SENTIMENT_LABELS)
+
+        product_name = get_first_not_empty_value(df_product, product_name_candidates, f"Товар {nm_id}")
+        category_name = get_first_not_empty_value(df_product, category_candidates, "Загруженные данные")
+        product_url = get_first_not_empty_value(df_product, url_candidates, "")
+
+        pros, cons = pros_cons_from_predictions(df_product, text_col, top_k=5)
+
+        stats = {
+            "total_reviews": len(df_product),
+            "positive": int((df_product["sentiment"] == 2).sum()),
+            "negative": int((df_product["sentiment"] == 1).sum()),
+            "neutral": int((df_product["sentiment"] == 0).sum())
+        }
+
+        summary_text = build_summary_text(product_name, stats, pros, cons)
+
+        analyzed_products.append({
+            "nm_id": str(nm_id),
+            "product_name": product_name,
+            "category_name": category_name,
+            "product_url": product_url,
+            "summary_text": summary_text,
+            "stats": stats,
+            "pros": pros,
+            "cons": cons
+        })
+
+        export_cols = list(df_product.columns)
+        df_product_export = df_product[export_cols].copy()
+        df_product_export["nm_id_for_db"] = str(nm_id)
+        df_product_export["review_text_for_db"] = df_product_export[text_col].astype(str)
+
+        analyzed_reviews.append(df_product_export)
+
+    analyzed_df = pd.concat(analyzed_reviews, ignore_index=True) if analyzed_reviews else pd.DataFrame()
+
+    return analyzed_products, analyzed_df
+
+
+def save_uploaded_analysis_to_db(analyzed_products, analyzed_df):
+    """
+    Сохраняет результат анализа в текущие таблицы сервиса:
+    products, reviews, product_summary.
+
+    Используются только те поля, которые уже читает app.py.
+    """
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        for product in analyzed_products:
+            nm_id = product["nm_id"]
+
+            # products: обновляем, если товар уже есть, иначе добавляем
+            cursor.execute("SELECT 1 FROM products WHERE nm_id = %s LIMIT 1", (nm_id,))
+            product_exists = cursor.fetchone() is not None
+
+            if product_exists:
+                cursor.execute(
+                    """
+                    UPDATE products
+                    SET category_name = %s,
+                        product_name = %s,
+                        product_url = %s
+                    WHERE nm_id = %s
+                    """,
+                    (product["category_name"], product["product_name"], product["product_url"], nm_id)
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO products (nm_id, category_name, product_name, product_url)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (nm_id, product["category_name"], product["product_name"], product["product_url"])
+                )
+
+            # product_summary: обновляем или добавляем
+            cursor.execute("SELECT 1 FROM product_summary WHERE nm_id = %s LIMIT 1", (nm_id,))
+            summary_exists = cursor.fetchone() is not None
+
+            if summary_exists:
+                cursor.execute(
+                    """
+                    UPDATE product_summary
+                    SET summary_text = %s,
+                        chart_html = %s
+                    WHERE nm_id = %s
+                    """,
+                    (product["summary_text"], "", nm_id)
+                )
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO product_summary (nm_id, summary_text, chart_html)
+                    VALUES (%s, %s, %s)
+                    """,
+                    (nm_id, product["summary_text"], "")
+                )
+
+            # reviews: для загруженного товара заменяем отзывы новыми
+            cursor.execute("DELETE FROM reviews WHERE nm_id = %s", (nm_id,))
+
+            product_reviews = analyzed_df[analyzed_df["nm_id_for_db"].astype(str) == str(nm_id)]
+            review_rows = [
+                (
+                    str(nm_id),
+                    str(row["review_text_for_db"]),
+                    int(row["sentiment"]),
+                    float(row["confidence"])
+                )
+                for _, row in product_reviews.iterrows()
+            ]
+
+            if review_rows:
+                execute_batch(
+                    cursor,
+                    """
+                    INSERT INTO reviews (nm_id, review_text, sentiment, confidence)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    review_rows,
+                    page_size=500
+                )
+
+        conn.commit()
+        cursor.close()
+
+    except Exception:
+        if conn:
+            conn.rollback()
+        raise
+    finally:
+        if conn:
+            conn.close()
+
+
+def dataframe_to_excel_bytes(df):
+    """
+    Готовит Excel-файл для скачивания.
+    """
+    output = io.BytesIO()
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="analysis")
+
+    return output.getvalue()
+
+
 # --- ПОДГОТОВКА ДАННЫХ ---
 product_df = get_all_products()
 
@@ -505,7 +904,76 @@ if st.session_state.page == "Главная":
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 st.success(f"Файл '{uploaded_file.name}' готов к обработке")
-                # Здесь будет ваша логика обработки файлов
+
+                if st.button(
+                    f"Анализировать файл: {uploaded_file.name}",
+                    type="primary",
+                    icon=":material/psychology:",
+                    use_container_width=True,
+                    key=f"analyze_uploaded_{uploaded_file.name}"
+                ):
+                    try:
+                        with st.spinner("BERT-модель анализирует отзывы. Первый запуск может занять больше времени..."):
+                            uploaded_df = read_uploaded_reviews_file(uploaded_file)
+                            analyzed_products, analyzed_df = analyze_uploaded_reviews_dataframe(uploaded_df)
+                            save_uploaded_analysis_to_db(analyzed_products, analyzed_df)
+
+                        st.session_state.uploaded_analysis_df = analyzed_df
+                        st.session_state.uploaded_products = analyzed_products
+                        st.session_state.uploaded_file_name = uploaded_file.name
+
+                        if analyzed_products:
+                            st.session_state.current_sku = analyzed_products[0]["nm_id"]
+                            st.session_state.page = "Аналитика"
+
+                        st.success("Файл обработан, результаты сохранены в базу.")
+                        st.rerun()
+
+                    except Exception as e:
+                        st.error(f"Ошибка при обработке файла: {e}")
+
+        if "uploaded_analysis_df" in st.session_state and not st.session_state.uploaded_analysis_df.empty:
+            st.markdown("#### Последний обработанный файл")
+            st.caption(st.session_state.get("uploaded_file_name", ""))
+
+            uploaded_result_df = st.session_state.uploaded_analysis_df
+
+            total_reviews = len(uploaded_result_df)
+            total_products = uploaded_result_df["nm_id_for_db"].nunique() if "nm_id_for_db" in uploaded_result_df.columns else 0
+            positive_count = int((uploaded_result_df["sentiment"] == 2).sum()) if "sentiment" in uploaded_result_df.columns else 0
+
+            m_upload_1, m_upload_2, m_upload_3 = st.columns(3)
+            m_upload_1.metric("Товаров", total_products)
+            m_upload_2.metric("Отзывов", total_reviews)
+            m_upload_3.metric("Позитивных", positive_count)
+
+            st.dataframe(
+                uploaded_result_df[[
+                    col for col in [
+                        "nm_id_for_db",
+                        "review_text_for_db",
+                        "sentiment",
+                        "sentiment_label",
+                        "confidence",
+                        "prob_neutral",
+                        "prob_negative",
+                        "prob_positive"
+                    ]
+                    if col in uploaded_result_df.columns
+                ]],
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                label="Скачать обработанный файл",
+                data=dataframe_to_excel_bytes(uploaded_result_df),
+                file_name="analyzed_reviews.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                icon=":material/download:",
+                key="download_uploaded_analysis"
+            )
 
 
 
