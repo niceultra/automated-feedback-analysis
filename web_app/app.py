@@ -496,7 +496,7 @@ if st.session_state.page == "Главная":
     with col_upload:
         st.markdown("### Загрузка данных")
         uploaded_files = st.file_uploader(
-            "Перетащите файл с отзывами сюда, чтобы проанализировать с помощью нейросети",
+            "Перетащите файл с отзывами сюда, чтобы проанализировать его с помощью нейросети",
             type=["csv", "xlsx"],
             accept_multiple_files=True,
             help="Поддерживаются форматы CSV и Excel"
