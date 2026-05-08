@@ -2,12 +2,10 @@ import os
 import streamlit as st
 import pandas as pd
 import psycopg2
-import streamlit.components.v1 as components
 from PIL import Image
 import plotly.express as px
 import requests
 import uuid
-import base64
 import time
 from requests.exceptions import SSLError
 
@@ -63,7 +61,42 @@ def get_db_connection():
         port=6432,
         sslmode='require'
     )
+def request_with_retries(method, url, max_attempts=4, timeout=60, **kwargs):
+    """
+    Выполняет HTTP-запрос с повторными попытками.
+    Нужно для GigaChat, потому что соединение иногда сбрасывается сервером.
+    """
+    last_error = None
 
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.request(
+                method=method,
+                url=url,
+                timeout=timeout,
+                **kwargs
+            )
+
+            # Повторяем запрос при временных ошибках сервера
+            if response.status_code in (429, 500, 502, 503, 504):
+                last_error = f"HTTP {response.status_code}: {response.text[:300]}"
+
+                if attempt < max_attempts:
+                    time.sleep(2 * attempt)
+                    continue
+
+            return response
+
+        except (SSLError, ConnectionError, Timeout) as e:
+            last_error = e
+
+            if attempt < max_attempts:
+                time.sleep(2 * attempt)
+                continue
+
+            raise
+
+    raise RuntimeError(f"Не удалось выполнить запрос после нескольких попыток: {last_error}")
 
 def generate_marketing_content(strengths, weaknesses):
     """
@@ -108,12 +141,14 @@ def generate_marketing_content(strengths, weaknesses):
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-        response = requests.post(
+        response = request_with_retries(
+            "POST",
             token_url,
             headers=headers,
             data=payload,
             verify=False,
-            timeout=10
+            timeout=20,
+            max_attempts=3
         )
 
 
@@ -188,20 +223,15 @@ def generate_marketing_content(strengths, weaknesses):
         }
 
         # Повторяем запрос при ошибках SSL (частая проблема с Сбером)
-        for attempt in range(3):
-            try:
-                chat_response = requests.post(
-                    chat_url,
-                    headers=chat_headers,
-                    json=chat_payload,
-                    verify=False,
-                    timeout=30
-                )
-                break
-            except SSLError:
-                if attempt == 2:
-                    raise
-                time.sleep(1)
+        chat_response = request_with_retries(
+            "POST",
+            chat_url,
+            headers=chat_headers,
+            json=chat_payload,
+            verify=False,
+            timeout=90,
+            max_attempts=4
+        )
 
         chat_response.raise_for_status()
         result = chat_response.json()
