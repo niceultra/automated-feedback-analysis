@@ -482,7 +482,65 @@ elif st.session_state.page == "Аналитика":
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
             col_chart, col_text = st.columns([1, 2])
 
-            # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
+            # --- ЛЕВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
+            with col_text:
+                st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
+
+                # --- ГЕНЕРАЦИЯ МАРКЕТИНГОВОГО КОНТЕНТА ---
+                st.markdown('<div class="section-title">💡 Генерация маркетингового контента</div>',
+                            unsafe_allow_html=True)
+
+                # Извлекаем сильные и слабые стороны
+                strengths, weaknesses = extract_strengths_weaknesses(summary_text)
+
+                # Проверяем, есть ли данные для генерации
+                if strengths or weaknesses:
+                    # Показываем краткую статистику
+                    st.caption(f"Найдено: {len(strengths)} сильных сторон и {len(weaknesses)} слабых сторон")
+
+                    # Кнопка для генерации контента
+                    if st.button("Сгенерировать стратегический маркетинговый отчет",
+                                 type="primary",
+                                 icon=":material/rocket_launch:",
+                                 use_container_width=True):
+                        with st.spinner("Генерация контента через Google Gemini... Это займет 15-20 секунд"):
+                            # Генерируем контент
+                            marketing_content = generate_marketing_content(strengths, weaknesses)
+
+                            # Сохраняем результат в состояние
+                            st.session_state.marketing_content = marketing_content
+                            st.session_state.content_generated = True
+
+                # Отображаем результат, если он уже сгенерирован
+                if 'content_generated' in st.session_state and st.session_state.content_generated:
+                    st.markdown("### 📈 Стратегический маркетинговый отчет")
+                    st.markdown(st.session_state.marketing_content)
+                    st.markdown('</div>', unsafe_allow_html=True)
+
+                    # Добавляем кнопки действий
+                    col1, col2 = st.columns([1, 1])
+                    with col1:
+                        st.download_button(
+                            label="Скачать отчет",
+                            data=st.session_state.marketing_content,
+                            file_name=f"marketing_report_{current_sku}.md",
+                            mime="text/markdown",
+                            use_container_width=True,
+                            icon=":material/download:"
+                        )
+
+                    with col2:
+                        if st.button("Сгенерировать заново",
+                                     use_container_width=True,
+                                     icon=":material/refresh:"):
+                            # Удаляем предыдущий результат
+                            if 'marketing_content' in st.session_state:
+                                del st.session_state.marketing_content
+                            if 'content_generated' in st.session_state:
+                                del st.session_state.content_generated
+                            st.rerun()
+
+            # --- ППРАВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
             with col_chart:
                 st.markdown('<div class="section-title">📈 Распределение мнений</div>', unsafe_allow_html=True)
 
@@ -552,63 +610,7 @@ elif st.session_state.page == "Аналитика":
                 else:
                     st.info("Нет данных для анализа")
 
-            # --- ПРАВАЯ КОЛОНКА: ТЕКСТОВОЕ РЕЗЮМЕ ---
-            with col_text:
-                st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
 
-                # --- ГЕНЕРАЦИЯ МАРКЕТИНГОВОГО КОНТЕНТА ---
-                st.markdown('<div class="section-title">💡 Генерация маркетингового контента</div>',
-                            unsafe_allow_html=True)
-
-                # Извлекаем сильные и слабые стороны
-                strengths, weaknesses = extract_strengths_weaknesses(summary_text)
-
-                # Проверяем, есть ли данные для генерации
-                if strengths or weaknesses:
-                    # Показываем краткую статистику
-                    st.caption(f"Найдено: {len(strengths)} сильных сторон и {len(weaknesses)} слабых сторон")
-
-                    # Кнопка для генерации контента
-                    if st.button("Сгенерировать стратегический маркетинговый отчет",
-                                 type="primary",
-                                 icon=":material/rocket_launch:",
-                                 use_container_width=True):
-                        with st.spinner("Генерация контента через Google Gemini... Это займет 15-20 секунд"):
-                            # Генерируем контент
-                            marketing_content = generate_marketing_content(strengths, weaknesses)
-
-                            # Сохраняем результат в состояние
-                            st.session_state.marketing_content = marketing_content
-                            st.session_state.content_generated = True
-
-                # Отображаем результат, если он уже сгенерирован
-                if 'content_generated' in st.session_state and st.session_state.content_generated:
-                    st.markdown("### 📈 Стратегический маркетинговый отчет")
-                    st.markdown(st.session_state.marketing_content)
-                    st.markdown('</div>', unsafe_allow_html=True)
-
-                    # Добавляем кнопки действий
-                    col1, col2 = st.columns([1, 1])
-                    with col1:
-                        st.download_button(
-                            label="Скачать отчет",
-                            data=st.session_state.marketing_content,
-                            file_name=f"marketing_report_{current_sku}.md",
-                            mime="text/markdown",
-                            use_container_width=True,
-                            icon=":material/download:"
-                        )
-
-                    with col2:
-                        if st.button("Сгенерировать заново",
-                                     use_container_width=True,
-                                     icon=":material/refresh:"):
-                            # Удаляем предыдущий результат
-                            if 'marketing_content' in st.session_state:
-                                del st.session_state.marketing_content
-                            if 'content_generated' in st.session_state:
-                                del st.session_state.content_generated
-                            st.rerun()
 
             # 3. Исходные отзывы
             with st.expander("🔍 Подробная статистика отзывов"):
