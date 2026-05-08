@@ -118,9 +118,6 @@ def generate_marketing_content(strengths, weaknesses):
             timeout=10
         )
 
-        # Добавляем отладочную информацию
-        st.write(f"Status code: {response.status_code}")
-        st.write(f"Response: {response.text}")
 
         if response.status_code != 200:
             return f"Ошибка при получении токена ({response.status_code}): {response.text}"
