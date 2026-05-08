@@ -69,7 +69,6 @@ def generate_marketing_content(strengths, weaknesses):
     """
     Генерирует маркетинговый отчет с использованием GigaChat API
     """
-
     # Проверка наличия необходимых секретов
     required_secrets = ["GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"]
     missing_secrets = [s for s in required_secrets if s not in st.secrets]
@@ -80,10 +79,15 @@ def generate_marketing_content(strengths, weaknesses):
     client_id = st.secrets["GIGACHAT_CLIENT_ID"]
     client_secret = st.secrets["GIGACHAT_CLIENT_SECRET"]
 
-    # Формируем Authorization Key (Base64(client_id:client_secret))
-    auth_str = f"{client_id}:{client_secret}"
-    auth_bytes = auth_str.encode('ascii')
-    auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+    # КРИТИЧЕСКИ ВАЖНО: Правильная подготовка Basic Authorization
+    # Должно быть client_id:client_secret в Base64
+    auth_string = f"{client_id}:{client_secret}"
+
+    # Правильное Base64 кодирование (убираем b' и trailing = если нужно)
+    import base64
+    auth_bytes = auth_string.encode('utf-8')
+    base64_bytes = base64.b64encode(auth_bytes)
+    base64_string = base64_bytes.decode('utf-8')
 
     # Шаг 1: Получаем Access Token
     token_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
@@ -94,7 +98,7 @@ def generate_marketing_content(strengths, weaknesses):
         'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
         'RqUID': rq_uid,
-        'Authorization': f'Basic {auth_b64}'
+        'Authorization': f'Basic {base64_string}'
     }
 
     payload = {
@@ -102,7 +106,10 @@ def generate_marketing_content(strengths, weaknesses):
     }
 
     try:
-        # Отключаем проверку SSL из-за самоподписанных сертификатов Сбера
+        # Отключаем проверку SSL (временно для тестирования)
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
         response = requests.post(
             token_url,
             headers=headers,
@@ -110,6 +117,10 @@ def generate_marketing_content(strengths, weaknesses):
             verify=False,
             timeout=10
         )
+
+        # Добавляем отладочную информацию
+        st.write(f"Status code: {response.status_code}")
+        st.write(f"Response: {response.text}")
 
         if response.status_code != 200:
             return f"Ошибка при получении токена ({response.status_code}): {response.text}"
