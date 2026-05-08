@@ -98,7 +98,7 @@ def request_with_retries(method, url, max_attempts=4, timeout=60, **kwargs):
 
     raise RuntimeError(f"Не удалось выполнить запрос после нескольких попыток: {last_error}")
 
-def generate_marketing_content(strengths, weaknesses):
+def generate_marketing_content(product_name, strengths, weaknesses):
     """
     Генерирует маркетинговый отчет с использованием GigaChat API
     """
@@ -630,51 +630,70 @@ elif st.session_state.page == "Аналитика":
                 strengths, weaknesses = extract_strengths_weaknesses(summary_text)
 
                 # Проверяем, есть ли данные для генерации
+                # Проверяем, есть ли данные для генерации
                 if strengths or weaknesses:
-                    # Показываем краткую статистику
                     st.caption(f"Найдено: {len(strengths)} сильных сторон и {len(weaknesses)} слабых сторон")
 
-                    # Кнопка для генерации контента
-                    if st.button("Сгенерировать текст для объявления",
-                                 type="primary",
-                                 icon=":material/rocket_launch:",
-                                 use_container_width=True):
-                        with st.spinner("Генерация контента ... Это займет 15-20 секунд"):
-                            # Генерируем контент
-                            marketing_content = generate_marketing_content(strengths, weaknesses)
+                    # Основная кнопка генерации
+                    if st.button(
+                            "Сгенерировать текст для объявления",
+                            type="primary",
+                            icon=":material/campaign:",
+                            use_container_width=True,
+                            key="generate_ad_text"
+                    ):
+                        with st.spinner("Генерирую рекламный текст для объявления..."):
+                            marketing_content = generate_marketing_content(product_name, strengths, weaknesses)
 
-                            # Сохраняем результат в состояние
-                            st.session_state.marketing_content = marketing_content
-                            st.session_state.content_generated = True
+                        st.session_state.marketing_content = marketing_content
+                        st.session_state.content_generated = True
+                        st.rerun()
 
                 # Отображаем результат, если он уже сгенерирован
                 if 'content_generated' in st.session_state and st.session_state.content_generated:
+                    st.markdown(
+                        '<div class="result-box" style="margin-top: 20px;">',
+                        unsafe_allow_html=True
+                    )
+                    st.markdown("### 📝 Текст для объявления")
                     st.markdown(st.session_state.marketing_content)
                     st.markdown('</div>', unsafe_allow_html=True)
 
-                    # Добавляем кнопки действий
+                    # Текст для скачивания
+                    download_text = f"""Текст для объявления
+
+                Товар: {product_name}
+                Артикул: {current_sku}
+
+                {st.session_state.marketing_content}
+                """
+
                     col1, col2 = st.columns([1, 1])
+
                     with col1:
                         st.download_button(
-                            label="Скачать отчет",
-                            data=st.session_state.marketing_content,
-                            file_name=f"marketing_report_{current_sku}.md",
-                            mime="text/markdown",
+                            label="Скачать текст",
+                            data=download_text.encode("utf-8"),
+                            file_name=f"ad_text_{current_sku}.txt",
+                            mime="text/plain",
                             use_container_width=True,
-                            icon=":material/download:"
+                            icon=":material/download:",
+                            key="download_ad_text"
                         )
 
                     with col2:
-                        if st.button("Сгенерировать заново",
-                                     use_container_width=True,
-                                     icon=":material/refresh:"):
-                            # Удаляем предыдущий результат
-                            if 'marketing_content' in st.session_state:
-                                del st.session_state.marketing_content
-                            if 'content_generated' in st.session_state:
-                                del st.session_state.content_generated
-                            st.rerun()
+                        if st.button(
+                                "Сгенерировать другой вариант",
+                                use_container_width=True,
+                                icon=":material/refresh:",
+                                key="regenerate_ad_text"
+                        ):
+                            with st.spinner("Генерирую другой вариант текста..."):
+                                marketing_content = generate_marketing_content(product_name, strengths, weaknesses)
 
+                            st.session_state.marketing_content = marketing_content
+                            st.session_state.content_generated = True
+                            st.rerun()
             # 3. Исходные отзывы
             with st.expander("🔍 Подробная статистика отзывов"):
                 if reviews_df is not None and not reviews_df.empty:
