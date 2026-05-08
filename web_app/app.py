@@ -5,7 +5,11 @@ import psycopg2
 import streamlit.components.v1 as components
 from PIL import Image
 import plotly.express as px
-import google.generativeai as genai
+import requests
+import uuid
+import base64
+import time
+from requests.exceptions import SSLError
 
 
 def local_css(file_name):
@@ -63,42 +67,120 @@ def get_db_connection():
 
 def generate_marketing_content(strengths, weaknesses):
     """
-    Генерирует маркетинговый отчет на основе списков плюсов и минусов.
+    Генерирует маркетинговый отчет с использованием GigaChat API
     """
-    # Настройка API ключа (убедитесь, что добавили его в .streamlit/secrets.toml)
-    if "GEMINI_API_KEY" not in st.secrets:
-        return "Ошибка: Не найден GEMINI_API_KEY в секретах приложения."
+    # Проверка наличия необходимых секретов
+    required_secrets = ["GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"]
+    missing_secrets = [s for s in required_secrets if s not in st.secrets]
 
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
-    # Формируем запрос для нейросети
-    prompt = f"""
-    Ты — ведущий маркетинговый аналитик. На основе данных анализа отзывов составь стратегический отчет для продавца на маркетплейсе.
+    if missing_secrets:
+        return f"Ошибка: Не найдены секреты в приложении: {', '.join(missing_secrets)}\n\nДобавьте их в .streamlit/secrets.toml"
 
-    СИЛЬНЫЕ СТОРОНЫ ТОВАРА:
-    {', '.join(strengths) if strengths else 'Не выявлено'}
+    client_id = st.secrets["GIGACHAT_CLIENT_ID"]
+    client_secret = st.secrets["GIGACHAT_CLIENT_SECRET"]
 
-    СЛАБЫЕ СТОРОНЫ ТОВАРА:
-    {', '.join(weaknesses) if weaknesses else 'Не выявлено'}
+    # Формируем Authorization Key (Base64(client_id:client_secret))
+    auth_str = f"{client_id}:{client_secret}"
+    auth_bytes = auth_str.encode('ascii')
+    auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
 
-    Твоя задача составить отчет по следующим пунктам:
-    1. Уникальное торговое предложение (УТП) — на чем сделать акцент в рекламе.
-    2. Рекомендации по улучшению продукта — как устранить негатив.
-    3. Идеи для инфографики — какие буллиты вынести на главные фото.
-    4. Тональность ответов — как общаться с покупателями в отзывах.
+    # Шаг 1: Получаем Access Token
+    token_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+    scope = "GIGACHAT_API_PERS"
+    rq_uid = str(uuid.uuid4())
 
-    Пиши профессионально, лаконично и на русском языке. Используй Markdown для оформления.
-    """
+    headers = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
+        'RqUID': rq_uid,
+        'Authorization': f'Basic {auth_b64}'
+    }
+
+    payload = {
+        'scope': scope
+    }
 
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        # Отключаем проверку SSL из-за самоподписанных сертификатов Сбера
+        response = requests.post(
+            token_url,
+            headers=headers,
+            data=payload,
+            verify=False,
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            return f"Ошибка при получении токена ({response.status_code}): {response.text}"
+
+        access_token = response.json().get('access_token')
+        if not access_token:
+            return f"Не удалось получить access_token: {response.text}"
+
+        # Шаг 2: Готовим промпт
+        prompt = f"""
+        Ты — ведущий маркетинговый аналитик. На основе данных анализа отзывов составь стратегический отчет для продавца на маркетплейсе.
+
+        СИЛЬНЫЕ СТОРОНЫ ТОВАРА:
+        {', '.join(strengths) if strengths else 'Не выявлено'}
+
+        СЛАБЫЕ СТОРОНЫ ТОВАРА:
+        {', '.join(weaknesses) if weaknesses else 'Не выявлено'}
+
+        Твоя задача составить отчет по следующим пунктам:
+        1. Уникальное торговое предложение (УТП) — на чем сделать акцент в рекламе.
+        2. Рекомендации по улучшению продукта — как устранить негатив.
+        3. Идеи для инфографики — какие буллиты вынести на главные фото.
+        4. Тональность ответов — как общаться с покупателями в отзывах.
+
+        Пиши профессионально, лаконично и на русском языке. Используй Markdown для оформления.
+        """
+
+        # Шаг 3: Отправляем запрос к GigaChat
+        chat_url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
+
+        chat_payload = {
+            "model": "GigaChat",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7,
+            "max_tokens": 1000
+        }
+
+        chat_headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {access_token}'
+        }
+
+        # Повторяем запрос при ошибках SSL (частая проблема с Сбером)
+        for attempt in range(3):
+            try:
+                chat_response = requests.post(
+                    chat_url,
+                    headers=chat_headers,
+                    json=chat_payload,
+                    verify=False,
+                    timeout=30
+                )
+                break
+            except SSLError:
+                if attempt == 2:
+                    raise
+                time.sleep(1)
+
+        chat_response.raise_for_status()
+        result = chat_response.json()
+
+        # Извлекаем ответ из структуры GigaChat
+        if 'choices' in result and len(result['choices']) > 0:
+            return result['choices'][0]['message']['content']
+        else:
+            return f"Неожиданный формат ответа от API: {result}"
+
     except Exception as e:
-        return f"Произошла ошибка при обращении к Gemini AI: {str(e)}"
-
-    available_models = [m.name for m in genai.list_models()]
-    st.write("Доступные модели:", available_models)
-
+        return f"Произошла ошибка при работе с GigaChat API: {str(e)}"
 
 def get_product_analytics(nm_id):
     """Получает и текст резюме, и HTML-код графика"""
