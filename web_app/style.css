@@ -196,7 +196,7 @@ div[data-testid="stStatusWidget"] {
 
     border-radius: 18px !important;
 
-    background: rgba(229, 231, 235, 0.78) !important; /* светло-серый полупрозрачный */
+    background: rgba(156, 163, 175, 0.82) !important; /* более тёмный серый полупрозрачный */
     color: #1f2937 !important;
 
     border: 1px solid rgba(255, 255, 255, 0.45) !important;
@@ -258,33 +258,3 @@ div[data-testid="stStatusWidget"] button {
     display: none !important;
 }
 
-/* ===== РАЗМЫТИЕ ФОНА ВО ВРЕМЯ ЗАГРУЗКИ ===== */
-
-div[data-testid="stStatusWidget"] {
-    isolation: isolate !important;
-}
-
-/* Полноэкранный размытый слой за индикатором */
-div[data-testid="stStatusWidget"]::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-
-    width: 100vw;
-    height: 100vh;
-
-    z-index: -1;
-
-    background: rgba(255, 255, 255, 0.18);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-
-    pointer-events: none;
-}
-
-/* Размытие для темной темы */
-.stApp.stAppDark div[data-testid="stStatusWidget"]::before {
-    background: rgba(0, 0, 0, 0.22);
-    backdrop-filter: blur(5px);
-    -webkit-backdrop-filter: blur(5px);
-}
