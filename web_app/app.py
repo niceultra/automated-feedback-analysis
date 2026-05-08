@@ -605,7 +605,7 @@ elif st.session_state.page == "Аналитика":
                     st.caption(f"Найдено: {len(strengths)} сильных сторон и {len(weaknesses)} слабых сторон")
 
                     # Кнопка для генерации контента
-                    if st.button("Сгенерировать стратегический маркетинговый отчет",
+                    if st.button("Сгенерировать текст для объявления",
                                  type="primary",
                                  icon=":material/rocket_launch:",
                                  use_container_width=True):
