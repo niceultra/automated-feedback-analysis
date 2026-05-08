@@ -185,22 +185,23 @@ div[data-testid="stStatusWidget"] {
     z-index: 999999 !important;
 
     display: flex !important;
-    flex-direction: column !important;
+    flex-direction: row !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 8px !important;
+    gap: 12px !important;
 
-    padding: 18px 24px !important;
-    min-width: 130px !important;
-    min-height: 92px !important;
+    padding: 14px 22px !important;
+    min-width: 150px !important;
+    min-height: 56px !important;
 
     border-radius: 18px !important;
-    border: 1px solid rgba(17, 24, 39, 0.10) !important;
 
-    background: rgba(255, 255, 255, 0.92) !important;
+    background: rgba(229, 231, 235, 0.78) !important; /* светло-серый полупрозрачный */
     color: #1f2937 !important;
 
-    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+    box-shadow: 0 14px 35px rgba(15, 23, 42, 0.16) !important;
+
     backdrop-filter: blur(10px) !important;
     -webkit-backdrop-filter: blur(10px) !important;
 
@@ -208,14 +209,15 @@ div[data-testid="stStatusWidget"] {
     visibility: visible !important;
 }
 
-/* Надпись под иконкой */
+/* Надпись справа от иконки */
 div[data-testid="stStatusWidget"]::after {
     content: "Загрузка";
-    display: block;
-    font-size: 14px;
+    display: inline-block;
+    font-size: 15px;
     font-weight: 600;
     color: #1f2937;
-    line-height: 1.2;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 /* Цвет внутренних элементов */
@@ -223,26 +225,25 @@ div[data-testid="stStatusWidget"] * {
     color: #1f2937 !important;
 }
 
-/* Увеличиваем иконку */
+/* Размер иконки */
 div[data-testid="stStatusWidget"] svg {
-    width: 30px !important;
-    height: 30px !important;
+    width: 28px !important;
+    height: 28px !important;
 }
 
-/* Кнопка Stop, если появляется */
+/* Полностью скрываем кнопку Stop */
 div[data-testid="stStatusWidget"] button {
-    color: #1f2937 !important;
-    background: transparent !important;
-    border: none !important;
+    display: none !important;
 }
 
 /* ===== АДАПТАЦИЯ ДЛЯ ТЕМНОЙ ТЕМЫ ===== */
 
 .stApp.stAppDark div[data-testid="stStatusWidget"] {
-    background: rgba(17, 24, 39, 0.92) !important;
+    background: rgba(75, 85, 99, 0.72) !important; /* серый полупрозрачный для темной темы */
     color: #ffffff !important;
+
     border: 1px solid rgba(255, 255, 255, 0.16) !important;
-    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35) !important;
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.35) !important;
 }
 
 .stApp.stAppDark div[data-testid="stStatusWidget"]::after {
@@ -254,5 +255,5 @@ div[data-testid="stStatusWidget"] button {
 }
 
 .stApp.stAppDark div[data-testid="stStatusWidget"] button {
-    color: #ffffff !important;
+    display: none !important;
 }
