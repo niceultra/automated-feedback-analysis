@@ -173,12 +173,15 @@
     text-align: left !important;
     width: 100% !important;
 }
-/* ===== УСИЛЕНИЕ ВСТРОЕННОГО ИНДИКАТОРА ЗАГРУЗКИ STREAMLIT ===== */
+/* ===== ВСТРОЕННЫЙ ИНДИКАТОР STREAMLIT ПО ЦЕНТРУ ===== */
 
 div[data-testid="stStatusWidget"] {
     position: fixed !important;
-    top: 18px !important;
-    right: 24px !important;
+    top: 50% !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
+
     z-index: 999999 !important;
 
     background: rgba(17, 24, 39, 0.92) !important;
@@ -187,9 +190,9 @@ div[data-testid="stStatusWidget"] {
     border: 1px solid rgba(255, 255, 255, 0.18) !important;
     border-radius: 999px !important;
 
-    padding: 8px 14px !important;
-    min-width: 58px !important;
-    min-height: 42px !important;
+    padding: 12px 18px !important;
+    min-width: 70px !important;
+    min-height: 50px !important;
 
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28) !important;
     backdrop-filter: blur(8px) !important;
@@ -199,18 +202,18 @@ div[data-testid="stStatusWidget"] {
     visibility: visible !important;
 }
 
-/* Делаем внутренние элементы индикатора белыми и заметными */
+/* Белый цвет для всего содержимого */
 div[data-testid="stStatusWidget"] * {
     color: #ffffff !important;
 }
 
-/* Увеличиваем иконку загрузки */
+/* Увеличим иконку */
 div[data-testid="stStatusWidget"] svg {
-    width: 24px !important;
-    height: 24px !important;
+    width: 28px !important;
+    height: 28px !important;
 }
 
-/* Если появляется кнопка Stop, тоже делаем её аккуратной */
+/* Кнопка stop, если появляется */
 div[data-testid="stStatusWidget"] button {
     color: #ffffff !important;
     background: transparent !important;
