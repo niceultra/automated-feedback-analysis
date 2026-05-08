@@ -173,4 +173,46 @@
     text-align: left !important;
     width: 100% !important;
 }
+/* ===== УСИЛЕНИЕ ВСТРОЕННОГО ИНДИКАТОРА ЗАГРУЗКИ STREAMLIT ===== */
 
+div[data-testid="stStatusWidget"] {
+    position: fixed !important;
+    top: 18px !important;
+    right: 24px !important;
+    z-index: 999999 !important;
+
+    background: rgba(17, 24, 39, 0.92) !important;
+    color: #ffffff !important;
+
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    border-radius: 999px !important;
+
+    padding: 8px 14px !important;
+    min-width: 58px !important;
+    min-height: 42px !important;
+
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28) !important;
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Делаем внутренние элементы индикатора белыми и заметными */
+div[data-testid="stStatusWidget"] * {
+    color: #ffffff !important;
+}
+
+/* Увеличиваем иконку загрузки */
+div[data-testid="stStatusWidget"] svg {
+    width: 24px !important;
+    height: 24px !important;
+}
+
+/* Если появляется кнопка Stop, тоже делаем её аккуратной */
+div[data-testid="stStatusWidget"] button {
+    color: #ffffff !important;
+    background: transparent !important;
+    border: none !important;
+}
