@@ -1238,10 +1238,10 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    st.caption("Умная аналитика отзывов")
+    st.caption("Поиск и анализ отзывов WB")
     st.divider()
 
-    if st.button("Главная", icon=":material/home:", use_container_width=True):
+    if st.button("Поиск и анализ", icon=":material/search:", use_container_width=True):
         st.session_state.page = "Главная"
 
     if st.button("Аналитика", icon=":material/monitoring:", use_container_width=True):
@@ -1252,14 +1252,20 @@ with st.sidebar:
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
-    st.title("Аналитика отзывов с маркетплейсов")
-    st.markdown("<p style='color: #28a745; font-style: italic;margin-bottom: 25px;'>Автосбор и AI-анализ инсайтов</p>", unsafe_allow_html=True)
+    st.title("Анализ отзывов Wildberries по артикулу или ссылке")
+    st.markdown(
+        "<p style='color: #28a745; font-style: italic; margin-bottom: 25px;'>"
+        "Введите артикул или ссылку на товар — сервис сам соберёт отзывы, "
+        "проанализирует их BERT-моделью и сохранит результат в базу."
+        "</p>",
+        unsafe_allow_html=True
+    )
 
-    # Метрики (оставляем как есть)
+    # Метрики главной страницы
     m1, m2, m3 = st.columns(3)
-    m1.metric("Позиций в базе", f'{len(product_df)}')
-    m2.metric("Активность системы", "Высокая")
-    m3.metric("Точность модели", "94%", delta="↑ 2%")
+    m1.metric("Товаров в базе", f'{len(product_df)}')
+    m2.metric("Основной режим", "Поиск по WB")
+    m3.metric("AI-анализ", "BERT + инсайты")
 
     st.divider()
 
@@ -1268,73 +1274,29 @@ if st.session_state.page == "Главная":
         <style>
         .custom-text {
             font-style: italic;
-            color: #707070; /* Светло-серый цвет */
-            margin-bottom: 20px; /* Отступ снизу */
+            color: #707070;
+            margin-bottom: 20px;
         }
         </style>
         <div class="custom-text">
-            Выберите категорию или артикул товара, чтобы увидеть аналитику
+            Основной сценарий — запустить новый анализ товара по артикулу или ссылке. База ниже нужна как справочник уже обработанных товаров.
         </div>
         """,
         unsafe_allow_html=True
     )
-    # --- СОЗДАЕМ КОЛОНКИ ---
-    # ratio [2, 1] значит, что левая колонка будет в два раза шире правой
-    col_nav, col_upload = st.columns([2, 1], gap="large")
 
-    # --- ЛЕВАЯ КОЛОНКА: НАВИГАЦИЯ ---
-    with col_nav:
-        search_query = st.text_input(
-            "Поиск по категориям",
-            placeholder="Например: Красота",
-            label_visibility="collapsed"
+    # Главный сценарий выводим первым и шире, база — рядом как второстепенный блок
+    col_analyze, col_saved = st.columns([1.35, 1], gap="large")
+
+    # --- ЛЕВАЯ КОЛОНКА: ОСНОВНОЙ СЦЕНАРИЙ — НОВЫЙ АНАЛИЗ ---
+    with col_analyze:
+        st.markdown("### 🔎 Новый анализ товара")
+        st.caption(
+            "Введите артикул или ссылку Wildberries. Сервис соберёт отзывы, "
+            "определит тональность, выделит ключевые плюсы и минусы и сохранит результат."
         )
 
-        if not product_df.empty:
-            categories = product_df['category_name'].unique()
-            if search_query:
-                categories = [cat for cat in categories if search_query.lower() in cat.lower()]
-
-            for category in categories:
-                with st.expander(f"{category}", expanded=False):
-                    cat_prods = product_df[product_df['category_name'] == category]
-                    for _, row in cat_prods.iterrows():
-                        is_active = normalize_sku(st.session_state.current_sku) == normalize_sku(row['nm_id'])
-
-                        # Используем нормальную Google-иконку, как обсуждали ранее
-                        icon_name = ":material/check_circle:" if is_active else None
-
-                        if st.button(
-                                row['product_name'],
-                                icon=icon_name,
-                                key=f"btn_{row['nm_id']}",
-                                use_container_width=True
-                        ):
-                            st.session_state.current_sku = normalize_sku(row['nm_id'])
-                            st.session_state.current_category = category
-                            st.rerun()
-
-            # --- УЛУЧШЕНИЕ: КНОПКА ПЕРЕХОДА К АНАЛИТИКЕ ---
-            if st.session_state.current_sku:
-                st.write("")  # Отступ
-                # Находим имя выбранного товара безопасно.
-                # Раньше здесь был .values[0], из-за него страница падала,
-                # если тип артикула в БД и session_state отличался.
-                selected_name = get_product_name_by_sku(product_df, st.session_state.current_sku)
-
-                st.info(f"Выбран товар: **{selected_name}**")
-
-                # Большая кнопка перехода
-                if st.button("Анализировать", type="primary", use_container_width=True):
-                    st.session_state.page = "Аналитика"
-                    st.rerun()
-
-    # --- ПРАВАЯ КОЛОНКА: ЗАГРУЗКА И СБОР ДАННЫХ ---
-    with col_upload:
-        st.markdown("### Загрузка данных")
-        st.caption("Можно загрузить готовый файл или сразу собрать отзывы Wildberries по артикулу/ссылке.")
-
-        tab_wb_search, tab_file_upload = st.tabs(["По артикулу/ссылке", "CSV / Excel"])
+        tab_wb_search, tab_file_upload = st.tabs(["Артикул / ссылка WB", "CSV / Excel"])
 
         with tab_wb_search:
             wb_products_text = st.text_area(
@@ -1344,7 +1306,7 @@ if st.session_state.page == "Главная":
                     "https://www.wildberries.ru/catalog/175088486/detail.aspx"
                 ),
                 height=120,
-                help="Можно указать один или несколько товаров: каждый артикул/ссылку с новой строки."
+                help="Можно указать один или несколько товаров: каждый артикул или ссылку с новой строки."
             )
 
             wb_limit = st.number_input(
@@ -1366,7 +1328,7 @@ if st.session_state.page == "Главная":
             )
 
             if st.button(
-                    "Найти отзывы, проанализировать и сохранить",
+                    "Запустить анализ товара",
                     type="primary",
                     icon=":material/search:",
                     use_container_width=True,
@@ -1375,7 +1337,7 @@ if st.session_state.page == "Главная":
                 try:
                     products = parse_wb_products_input(wb_products_text)
 
-                    with st.spinner("Ищу товары на Wildberries, собираю отзывы, запускаю BERT-модель и сохраняю данные в базу..."):
+                    with st.spinner("Собираю отзывы Wildberries, запускаю BERT-модель и сохраняю результат..."):
                         raw_df, fetch_report = fetch_wb_reviews_dataframe(
                             products,
                             limit=int(wb_limit),
@@ -1397,7 +1359,7 @@ if st.session_state.page == "Главная":
 
                     st.success(
                         f"Готово: обработано {len(analyzed_df)} отзывов "
-                        f"по {len(product_summaries)} товар(ам). Данные сохранены в базу."
+                        f"по {len(product_summaries)} товар(ам). Результат сохранён в базу."
                     )
 
                 except Exception as e:
@@ -1408,11 +1370,17 @@ if st.session_state.page == "Главная":
                     st.dataframe(pd.DataFrame(st.session_state.wb_fetch_report), use_container_width=True, hide_index=True)
 
         with tab_file_upload:
+            st.markdown("##### Анализ готового файла")
+            st.caption(
+                "Этот режим нужен, если отзывы уже собраны парсером или подготовлены вручную. "
+                "Для обычного пользователя проще использовать вкладку с артикулом или ссылкой."
+            )
+
             uploaded_files = st.file_uploader(
-                "Перетащите файл с отзывами сюда, чтобы проанализировать его с помощью нейросети",
+                "Перетащите файл с отзывами сюда",
                 type=["csv", "xlsx"],
                 accept_multiple_files=True,
-                help="Поддерживаются форматы CSV и Excel. Желательные колонки: nmId, product_name, category_name, product_url, rating, text."
+                help="Поддерживаются CSV и Excel. Желательные колонки: nmId, product_name, category_name, product_url, rating, text."
             )
 
             if uploaded_files:
@@ -1440,7 +1408,7 @@ if st.session_state.page == "Главная":
 
                             st.success(
                                 f"Готово: обработано {len(analyzed_df)} отзывов "
-                                f"по {len(product_summaries)} товар(ам). Данные сохранены в базу."
+                                f"по {len(product_summaries)} товар(ам). Результат сохранён в базу."
                             )
 
                         except Exception as e:
@@ -1457,23 +1425,84 @@ if st.session_state.page == "Главная":
             )
 
             if st.button(
-                    "Открыть аналитику по загруженному товару",
+                    "Открыть аналитику по последнему обработанному товару",
                     use_container_width=True,
                     icon=":material/monitoring:"
             ):
                 st.session_state.page = "Аналитика"
                 st.rerun()
 
+    # --- ПРАВАЯ КОЛОНКА: ВТОРОСТЕПЕННЫЙ СЦЕНАРИЙ — ПОИСК В БАЗЕ ---
+    with col_saved:
+        st.markdown("### 📚 Найти товар в базе")
+        st.caption(
+            "Если товар уже анализировали раньше, его можно открыть из сохранённой базы без повторного сбора отзывов."
+        )
+
+        base_query = st.text_input(
+            "Поиск по базе",
+            placeholder="Название, категория или артикул",
+            label_visibility="collapsed"
+        )
+
+        if not product_df.empty:
+            filtered_products = product_df.copy()
+
+            if base_query:
+                q = base_query.lower().strip()
+                filtered_products = filtered_products[
+                    filtered_products['category_name'].fillna('').astype(str).str.lower().str.contains(q, na=False) |
+                    filtered_products['product_name'].fillna('').astype(str).str.lower().str.contains(q, na=False) |
+                    filtered_products['nm_id'].fillna('').astype(str).str.lower().str.contains(q, na=False)
+                ]
+
+            if filtered_products.empty:
+                st.info("В базе пока нет товаров по этому запросу. Запустите новый анализ по артикулу или ссылке.")
+            else:
+                categories = filtered_products['category_name'].fillna('Без категории').unique()
+
+                for category in categories:
+                    with st.expander(f"{category}", expanded=False):
+                        cat_prods = filtered_products[filtered_products['category_name'].fillna('Без категории') == category]
+
+                        for _, row in cat_prods.iterrows():
+                            is_active = normalize_sku(st.session_state.current_sku) == normalize_sku(row['nm_id'])
+                            icon_name = ":material/check_circle:" if is_active else None
+
+                            if st.button(
+                                    row['product_name'],
+                                    icon=icon_name,
+                                    key=f"btn_{row['nm_id']}",
+                                    use_container_width=True
+                            ):
+                                st.session_state.current_sku = normalize_sku(row['nm_id'])
+                                st.session_state.current_category = category
+                                st.rerun()
+
+                if st.session_state.current_sku:
+                    st.write("")
+                    selected_name = get_product_name_by_sku(product_df, st.session_state.current_sku)
+                    st.info(f"Выбран товар из базы: **{selected_name}**")
+
+                    if st.button("Открыть сохранённую аналитику", type="primary", use_container_width=True):
+                        st.session_state.page = "Аналитика"
+                        st.rerun()
+        else:
+            st.info("База пока пустая. Начните с анализа товара по артикулу или ссылке Wildberries.")
 
     st.divider()
 
     # Таблица каталога
-    st.subheader("Полный список артикулов")
+    st.subheader("База уже проанализированных товаров")
+    st.caption("Этот список пополняется автоматически после анализа по артикулу, ссылке или загруженному файлу.")
+
     if not product_df.empty:
         display_list = product_df[['nm_id', 'product_name', 'category_name']].rename(
-            columns={'nm_id': 'ID', 'product_name': 'Наименование', 'category_name': 'Категория'}
+            columns={'nm_id': 'Артикул', 'product_name': 'Наименование', 'category_name': 'Категория'}
         )
         st.dataframe(display_list, use_container_width=True, hide_index=True)
+    else:
+        st.info("Пока нет сохранённых товаров. Запустите первый анализ через форму выше.")
 
 # --- СТРАНИЦА: АНАЛИТИКА ---
 elif st.session_state.page == "Аналитика":
