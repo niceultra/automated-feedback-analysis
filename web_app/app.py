@@ -288,8 +288,21 @@ def get_all_products():
         # Используем обновленные названия колонок: category_name
         df = pd.read_sql("SELECT nm_id, category_name, product_name, product_url FROM products", conn)
         conn.close()
+
+        # Важно: после загрузки данных из WB артикул может прийти из БД числом,
+        # а в session_state хранится строкой. Приводим всё к строкам, чтобы поиск
+        # выбранного товара не падал с IndexError.
+        if not df.empty:
+            df["nm_id"] = df["nm_id"].astype(str).str.strip()
+            df["category_name"] = df["category_name"].fillna("Без категории").astype(str).str.strip()
+            df["product_name"] = df["product_name"].fillna("").astype(str).str.strip()
+            df["product_url"] = df["product_url"].fillna("").astype(str).str.strip()
+            df.loc[df["product_name"] == "", "product_name"] = "Товар " + df["nm_id"]
+            df.loc[df["category_name"] == "", "category_name"] = "Без категории"
+
         return df
-    except:
+    except Exception as e:
+        st.error(f"Ошибка при загрузке списка товаров: {e}")
         return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
 
 
@@ -388,6 +401,34 @@ def color_sentiment(val):
     if val == 2 or val == 'Positive': return 'color: #4caf50; font-weight: bold;'
     if val == 1 or val == 'Negative': return 'color: #f44336; font-weight: bold;'
     return 'color: #9e9e9e;'
+
+
+def normalize_sku(value):
+    """Приводит артикул к единому строковому виду для сравнения."""
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def get_product_row_by_sku(products_df, sku):
+    """Безопасно ищет товар в product_df по артикулу без ошибки IndexError."""
+    if products_df is None or products_df.empty or "nm_id" not in products_df.columns:
+        return pd.DataFrame()
+
+    sku_str = normalize_sku(sku)
+    return products_df[products_df["nm_id"].astype(str).str.strip() == sku_str]
+
+
+def get_product_name_by_sku(products_df, sku):
+    """Возвращает название товара или безопасную заглушку, если товара нет в product_df."""
+    product_row = get_product_row_by_sku(products_df, sku)
+
+    if not product_row.empty and "product_name" in product_row.columns:
+        value = product_row.iloc[0]["product_name"]
+        if pd.notna(value) and str(value).strip() and str(value).strip().lower() != "nan":
+            return str(value).strip()
+
+    return f"Товар {normalize_sku(sku)}"
 
 
 # --- ФУНКЦИИ ДЛЯ ЗАГРУЗКИ И АНАЛИЗА ПОЛЬЗОВАТЕЛЬСКИХ ФАЙЛОВ ---
@@ -1061,7 +1102,7 @@ if st.session_state.page == "Главная":
                 with st.expander(f"{category}", expanded=False):
                     cat_prods = product_df[product_df['category_name'] == category]
                     for _, row in cat_prods.iterrows():
-                        is_active = st.session_state.current_sku == row['nm_id']
+                        is_active = normalize_sku(st.session_state.current_sku) == normalize_sku(row['nm_id'])
 
                         # Используем нормальную Google-иконку, как обсуждали ранее
                         icon_name = ":material/check_circle:" if is_active else None
@@ -1072,16 +1113,17 @@ if st.session_state.page == "Главная":
                                 key=f"btn_{row['nm_id']}",
                                 use_container_width=True
                         ):
-                            st.session_state.current_sku = row['nm_id']
+                            st.session_state.current_sku = normalize_sku(row['nm_id'])
                             st.session_state.current_category = category
                             st.rerun()
 
             # --- УЛУЧШЕНИЕ: КНОПКА ПЕРЕХОДА К АНАЛИТИКЕ ---
             if st.session_state.current_sku:
                 st.write("")  # Отступ
-                # Находим имя выбранного товара для красоты
-                selected_name = product_df[product_df['nm_id'] == st.session_state.current_sku]['product_name'].values[
-                    0]
+                # Находим имя выбранного товара безопасно.
+                # Раньше здесь был .values[0], из-за него страница падала,
+                # если тип артикула в БД и session_state отличался.
+                selected_name = get_product_name_by_sku(product_df, st.session_state.current_sku)
 
                 st.info(f"Выбран товар: **{selected_name}**")
 
@@ -1250,14 +1292,7 @@ elif st.session_state.page == "Аналитика":
             summary_text = product_summary['summary_text']
             product_name = "Неизвестный товар"
             if not product_df.empty:
-                product_row = product_df[product_df['nm_id'] == current_sku]
-                if not product_row.empty:
-                    product_name = product_row['product_name'].values[0]
-                else:
-                    # Попробуем найти через строковое сравнение (на случай если типы не совпадают)
-                    product_row = product_df[product_df['nm_id'].astype(str) == str(current_sku)]
-                    if not product_row.empty:
-                        product_name = product_row['product_name'].values[0]
+                product_name = get_product_name_by_sku(product_df, current_sku)
 
             st.markdown(f"#### 📊 Отчет по товару: {product_name}")
 
