@@ -500,53 +500,254 @@ def load_sentiment_model():
     return tokenizer, model, device
 
 
-def predict_sentiment_batch(texts, batch_size=16):
-    """Пакетно определяет тональность отзывов: 0 — нейтрально, 1 — негативно, 2 — позитивно."""
+def predict_sentiment_batch(texts, max_length=256, batch_size=16, return_probs=False):
+    """
+    Пакетно определяет тональность отзывов.
+
+    Классы модели:
+    0 — нейтрально
+    1 — негативно
+    2 — позитивно
+
+    Логика перенесена из рабочего ноутбука:
+    тексты обрабатываются батчами, вероятности считаются через softmax.
+    """
     import torch
+    import numpy as np
 
     tokenizer, model, device = load_sentiment_model()
-    labels = []
-    confidences = []
+
+    if isinstance(texts, str):
+        texts = [texts]
+
+    texts = [str(t) for t in texts]
+
+    all_preds = []
+    all_probs = []
 
     for start in range(0, len(texts), batch_size):
-        batch = texts[start:start + batch_size]
+        batch_texts = texts[start:start + batch_size]
+
         encoded = tokenizer(
-            batch,
-            return_tensors="pt",
+            batch_texts,
             padding=True,
             truncation=True,
-            max_length=512
+            max_length=max_length,
+            return_tensors="pt"
         )
         encoded = {key: value.to(device) for key, value in encoded.items()}
 
         with torch.no_grad():
             outputs = model(**encoded)
-            probs = torch.softmax(outputs.logits, dim=1)
-            conf, pred = torch.max(probs, dim=1)
+            batch_probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
+            batch_preds = np.argmax(batch_probs, axis=1)
 
-        labels.extend(pred.cpu().tolist())
-        confidences.extend([round(float(x), 4) for x in conf.cpu().tolist()])
+        all_preds.extend(batch_preds.tolist())
+        all_probs.extend(batch_probs.tolist())
 
-    return labels, confidences
+    probs_array = np.array(all_probs)
+
+    confidences = []
+    for pred, probs in zip(all_preds, probs_array):
+        confidences.append(round(float(probs[int(pred)]), 4))
+
+    if return_probs:
+        return all_preds, confidences, probs_array
+
+    return all_preds, confidences
 
 
-def short_review_point(text, max_len=150):
-    """Делает короткий пункт для блока плюсов/минусов из текста отзыва."""
+def predict_positive_probability_for_shap(texts, max_length=256):
+    """
+    Возвращает вероятность положительного класса.
+    Нужна для SHAP-анализа, как в рабочем ноутбуке.
+    """
+    import torch
+    import numpy as np
+
+    tokenizer, model, device = load_sentiment_model()
+
+    if isinstance(texts, str):
+        texts = [texts]
+
+    processed = []
+    for text in texts:
+        if isinstance(text, list):
+            processed.append(" ".join(str(x) for x in text))
+        else:
+            processed.append(str(text))
+
+    encoded = tokenizer(
+        processed,
+        padding=True,
+        truncation=True,
+        max_length=max_length,
+        return_tensors="pt"
+    )
+    encoded = {key: value.to(device) for key, value in encoded.items()}
+
+    with torch.no_grad():
+        outputs = model(**encoded)
+        probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()
+
+    if probs.ndim == 2 and probs.shape[1] >= 3:
+        return probs[:, 2]
+
+    # Защита на случай другой конфигурации модели.
+    return np.max(probs, axis=1)
+
+
+@st.cache_resource(show_spinner=False)
+def load_shap_explainer():
+    """
+    Создает SHAP explainer для выбора наиболее характерных плюсов и минусов.
+    Если shap не установлен на сервере, возвращает None — тогда сработает резервная логика.
+    """
+    try:
+        import shap
+
+        masker = shap.maskers.Text(tokenizer=r"\W+")
+        return shap.Explainer(predict_positive_probability_for_shap, masker=masker)
+    except Exception:
+        return None
+
+
+def normalize_review_point(text, max_len=260):
+    """Очищает текст инсайта, но не превращает его в слишком короткую фразу."""
     text = re.sub(r"\s+", " ", str(text)).strip()
+    text = text.strip(" .,!?:;—-")
+
     if not text:
-        return "Недостаточно текстовых данных"
+        return ""
 
-    sentence_parts = re.split(r"(?<=[.!?])\s+", text)
-    point = sentence_parts[0].strip() if sentence_parts else text
+    # Отсекаем совсем неинформативные фразы вроде «1», «не чего», «кошмар».
+    words = re.findall(r"[A-Za-zА-Яа-яЁё0-9]+", text)
+    if len(text) < 18 or len(words) < 3:
+        return ""
 
-    if len(point) > max_len:
-        point = point[:max_len].rsplit(" ", 1)[0] + "..."
+    if len(text) > max_len:
+        text = text[:max_len].rsplit(" ", 1)[0].strip() + "..."
 
-    return point.rstrip(".,;: ")
+    return text
 
 
-def build_summary_text(product_name, group_df):
-    """Формирует текстовую аналитику в формате, который уже понимает блок генерации объявления."""
+def unique_nonempty_points(points, limit=5):
+    """Убирает пустые значения и дубли с сохранением порядка."""
+    result = []
+    seen = set()
+
+    for point in points:
+        cleaned = normalize_review_point(point)
+        if not cleaned:
+            continue
+
+        key = cleaned.lower()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        result.append(cleaned)
+
+        if len(result) >= limit:
+            break
+
+    return result
+
+
+def fallback_pros_cons_from_reviews(group_df, top_k=5):
+    """
+    Резервный способ выбора плюсов/минусов, если SHAP недоступен.
+    Выбирает более содержательные отзывы, а не самые короткие и не только по confidence.
+    """
+    df = group_df.copy()
+    df["review_text"] = df["review_text"].fillna("").astype(str)
+    df["text_len"] = df["review_text"].str.len()
+
+    positive_candidates = (
+        df[(df["sentiment"] == 2) & (df["text_len"] >= 40)]
+        .sort_values(["confidence", "text_len"], ascending=[False, False])["review_text"]
+        .tolist()
+    )
+
+    negative_candidates = (
+        df[(df["sentiment"] == 1) & (df["text_len"] >= 25)]
+        .sort_values(["confidence", "text_len"], ascending=[False, False])["review_text"]
+        .tolist()
+    )
+
+    # Если негативных отзывов мало, берем отзывы с низкой позитивной вероятностью / нейтральные.
+    if len(negative_candidates) < top_k and "prob_pos" in df.columns:
+        extra = (
+            df[(df["sentiment"].isin([0, 1])) & (df["text_len"] >= 25)]
+            .sort_values(["prob_pos", "text_len"], ascending=[True, False])["review_text"]
+            .tolist()
+        )
+        negative_candidates.extend(extra)
+
+    pros = unique_nonempty_points(positive_candidates, limit=top_k)
+    cons = unique_nonempty_points(negative_candidates, limit=top_k)
+
+    return pros, cons
+
+
+def pros_cons_from_reviews(texts, n_samples=50, top_k=5):
+    """
+    Извлекает ключевые плюсы и минусы по логике из рабочего ноутбука:
+    SHAP оценивает вклад текста в вероятность положительного класса,
+    затем выбираются отзывы с самым сильным положительным и отрицательным вкладом.
+    """
+    import random
+    import numpy as np
+
+    valid_texts = []
+    for text in texts:
+        cleaned = normalize_review_point(text, max_len=1000)
+        if cleaned:
+            valid_texts.append(cleaned)
+
+    if not valid_texts:
+        return [], []
+
+    if len(valid_texts) > n_samples:
+        # Фиксированный seed нужен, чтобы один и тот же товар не менял инсайты при каждом запуске.
+        texts_for_shap = random.Random(42).sample(valid_texts, n_samples)
+    else:
+        texts_for_shap = valid_texts
+
+    explainer = load_shap_explainer()
+    if explainer is None:
+        return [], []
+
+    try:
+        shap_values = explainer(texts_for_shap)
+    except Exception:
+        return [], []
+
+    scored_sentences = []
+
+    for index, example in enumerate(shap_values):
+        total_impact = float(np.sum(example.values))
+        clean_text = normalize_review_point(texts_for_shap[index], max_len=300)
+
+        if clean_text:
+            scored_sentences.append((clean_text, total_impact))
+
+    pros_raw = sorted(scored_sentences, key=lambda item: item[1], reverse=True)
+    cons_raw = sorted(scored_sentences, key=lambda item: item[1])
+
+    pros = unique_nonempty_points([text for text, score in pros_raw if score > 0.1], limit=top_k)
+    cons = unique_nonempty_points([text for text, score in cons_raw if score < 0], limit=top_k)
+
+    return pros, cons
+
+
+def build_summary_text(product_name, group_df, product_category=""):
+    """
+    Формирует текстовую аналитику в формате, который уже понимает блок генерации объявления.
+
+    Важно: плюсы и минусы теперь строятся не из первых коротких отзывов,
+    а по SHAP-логике из рабочего ноутбука, поэтому инсайты становятся содержательнее.
+    """
     total = len(group_df)
     positive_count = int((group_df["sentiment"] == 2).sum())
     negative_count = int((group_df["sentiment"] == 1).sum())
@@ -556,39 +757,36 @@ def build_summary_text(product_name, group_df):
     negative_share = round(negative_count / total * 100, 1) if total else 0
     neutral_share = round(neutral_count / total * 100, 1) if total else 0
 
-    positive_reviews = (
-        group_df[group_df["sentiment"] == 2]
-        .sort_values("confidence", ascending=False)["review_text"]
-        .dropna()
-        .astype(str)
-        .head(5)
-        .tolist()
-    )
-    negative_reviews = (
-        group_df[group_df["sentiment"] == 1]
-        .sort_values("confidence", ascending=False)["review_text"]
-        .dropna()
-        .astype(str)
-        .head(5)
-        .tolist()
+    # Основной способ — SHAP, как в рабочем ноутбуке.
+    pros, cons = pros_cons_from_reviews(
+        group_df["review_text"].fillna("").astype(str).tolist(),
+        n_samples=min(50, total),
+        top_k=5
     )
 
-    if not positive_reviews:
-        positive_reviews = ["Позитивные особенности товара по загруженным отзывам выражены слабо"]
-    if not negative_reviews:
-        negative_reviews = ["Существенные повторяющиеся минусы по загруженным отзывам не выявлены"]
+    # Резервный способ, если shap не установлен или не смог обработать тексты.
+    if len(pros) < 3 or len(cons) < 2:
+        fallback_pros, fallback_cons = fallback_pros_cons_from_reviews(group_df, top_k=5)
 
-    plus_lines = "\n".join(
-        f"{idx}. {short_review_point(review)}"
-        for idx, review in enumerate(positive_reviews, start=1)
-    )
-    minus_lines = "\n".join(
-        f"{idx}. {short_review_point(review)}"
-        for idx, review in enumerate(negative_reviews, start=1)
-    )
+        if len(pros) < 3:
+            pros = unique_nonempty_points(pros + fallback_pros, limit=5)
+
+        if len(cons) < 2:
+            cons = unique_nonempty_points(cons + fallback_cons, limit=5)
+
+    if not pros:
+        pros = ["Позитивные особенности товара по загруженным отзывам выражены слабо"]
+
+    if not cons:
+        cons = ["Существенные повторяющиеся минусы по загруженным отзывам не выявлены"]
+
+    plus_lines = "\n".join(f"{idx}. {point}" for idx, point in enumerate(pros, start=1))
+    minus_lines = "\n".join(f"{idx}. {point}" for idx, point in enumerate(cons, start=1))
+
+    category_line = f"Категория: {product_category}\n" if product_category else ""
 
     return f"""АНАЛИТИКА ПО ТОВАРУ: {product_name}
-
+{category_line}
 Всего обработано отзывов: {total}
 Позитивные отзывы: {positive_count} ({positive_share}%)
 Негативные отзывы: {negative_count} ({negative_share}%)
@@ -600,7 +798,6 @@ def build_summary_text(product_name, group_df):
 КЛЮЧЕВЫЕ МИНУСЫ:
 {minus_lines}
 """
-
 
 def prepare_uploaded_reviews_dataframe(df):
     """Приводит пользовательский файл к единой структуре для анализа и записи в БД."""
@@ -672,7 +869,7 @@ def analyze_uploaded_reviews(df):
             "product_name": str(first_row["product_name"]),
             "category_name": str(first_row["category_name"]),
             "product_url": str(first_row["product_url"]),
-            "summary_text": build_summary_text(str(first_row["product_name"]), group),
+            "summary_text": build_summary_text(str(first_row["product_name"]), group, str(first_row["category_name"])),
             "chart_html": ""
         })
 
