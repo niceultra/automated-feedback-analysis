@@ -1252,7 +1252,7 @@ with st.sidebar:
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
-    st.title("Анализ отзывов Wildberries ")
+    st.title("Анализ отзывов Wildberries")
     st.markdown(
         "<p style='color: #28a745; font-style: italic; margin-bottom: 25px;'>"
         "Введите артикул или ссылку на товар — сервис сам соберёт отзывы, "
