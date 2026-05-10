@@ -3,10 +3,10 @@ import io
 import re
 import gzip
 import json
-import html
 import streamlit as st
 import pandas as pd
 import psycopg2
+from PIL import Image
 import plotly.express as px
 import requests
 import uuid
@@ -17,24 +17,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-# --- ПУТИ К ФАЙЛАМ ПРОЕКТА ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LOGO_SVG = os.path.join(BASE_DIR, "images", "logo.svg")
-
-
-# --- НАСТРОЙКА СТРАНИЦЫ ---
-# SVG сюда не ставим. Для вкладки браузера используем эмодзи,
-# а качественный SVG выводим отдельно в интерфейсе.
-st.set_page_config(
-    page_title="ИнСайт Бот • Умная аналитика отзывов",
-    page_icon="🔎",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-
 def local_css(file_name):
-    file_path = os.path.join(BASE_DIR, file_name)
+    # Получаем абсолютный путь к директории, где лежит сам скрипт
+    parent_dir = os.path.dirname(os.path.abspath(__file__))
+    # Соединяем путь с именем файла
+    file_path = os.path.join(parent_dir, file_name)
 
     if os.path.exists(file_path):
         with open(file_path, encoding="utf-8") as f:
@@ -42,40 +29,18 @@ def local_css(file_name):
     else:
         st.error(f"Файл {file_name} не найден по пути: {file_path}")
 
-
-def render_svg_logo(svg_path, width=45):
-    """
-    Надежно выводит SVG как встроенный HTML.
-    Так качество не теряется, в отличие от маленького PNG.
-    """
-    if not os.path.exists(svg_path):
-        st.error(f"Логотип не найден: {svg_path}")
-        return
-
-    with open(svg_path, "r", encoding="utf-8") as f:
-        svg = f.read()
-
-    # убираем XML declaration, если есть
-    svg = re.sub(r"<\?xml.*?\?>", "", svg, flags=re.DOTALL).strip()
-
-    st.markdown(
-        f"""
-        <div style="
-            width: {width}px;
-            height: {width}px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        ">
-            {svg}
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-
 local_css("style.css")
 
+
+# 1. Открываем изображение с помощью PIL
+img = Image.open("./images/logo.png")
+# 2. Передаем объект изображения в конфигурацию
+st.set_page_config(
+    page_title="ИнСайт Бот • Умная аналитика отзывов",
+    page_icon=img,
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # --- ИНИЦИАЛИЗАЦИЯ СОСТОЯНИЯ ---
 if 'page' not in st.session_state:
@@ -85,13 +50,15 @@ if 'current_sku' not in st.session_state:
 if 'current_category' not in st.session_state:
     st.session_state.current_category = None
 
-
 # --- ДАННЫЕ ПОДКЛЮЧЕНИЯ ---
 DB_HOST = st.secrets["DB_HOST"]
 DB_NAME = st.secrets["DB_NAME"]
 DB_USER = st.secrets["DB_USER"]
 DB_PASS = st.secrets["DB_PASS"]
 
+# Модель BERT для анализа тональности отзывов.
+# При необходимости можно переопределить в .streamlit/secrets.toml:
+# HF_MODEL_ID = "ваш_логин/ваша_модель"
 MODEL_ID = st.secrets.get("HF_MODEL_ID", "fsed/bert-review-sentiment-classifier")
 
 
@@ -1258,7 +1225,7 @@ with st.sidebar:
 
     with col1:
         # Укажите путь к вашему логотипу. Ширину (width) подберите под себя
-        render_svg_logo(LOGO_SVG, width=45)
+        st.image("./images/logo.png", width=45)
 
     with col2:
         # Текст заголовка без эмодзи
@@ -1285,7 +1252,7 @@ with st.sidebar:
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
-    st.title("Анализ отзывов Wildberries")
+    st.title("Анализ отзывов Wildberries ")
     st.markdown(
         "<p style='color: #28a745; font-style: italic; margin-bottom: 25px;'>"
         "Введите артикул или ссылку на товар — сервис сам соберёт отзывы, "
@@ -1369,7 +1336,7 @@ if st.session_state.page == "Главная":
                 try:
                     products = parse_wb_products_input(wb_products_text)
 
-                    with st.spinner("Собираю отзывы Wildberries, запускаю BERT-модель и сохраняю результат, это может занять время..."):
+                    with st.spinner("Собираю отзывы Wildberries, запускаю BERT-модель и сохраняю результат..."):
                         raw_df, fetch_report = fetch_wb_reviews_dataframe(
                             products,
                             limit=int(wb_limit),
