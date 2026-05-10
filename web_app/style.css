@@ -88,15 +88,14 @@
     }
     /* Эффект при наведении для интерактивности */
     div.stButton > button[kind="primary"]:hover {
-        background-color: #a29bfe !important; /* Светло-фиолетовый при ховере */
-        border: none !important;
-    }
+    background-color: #218838 !important; /* Темнее зеленый при наведении */
+    border: none !important;
+}
 
     /* Эффект при нажатии */
     div.stButton > button[kind="primary"]:active {
-        background-color: #4834d4 !important;
-    }
-
+    background-color: #1e7e34 !important;
+}
 
     /* Если хочешь ограничить ТОЛЬКО блок с экспандерами: */
     div[data-testid="stExpander"] {
@@ -173,7 +172,8 @@
     text-align: left !important;
     width: 100% !important;
 }
-/* ===== ВСТРОЕННЫЙ ИНДИКАТОР STREAMLIT ПО ЦЕНТРУ ===== */
+
+/* ===== ВСТРОЕННЫЙ ИНДИКАТОР STREAMLIT ПО ЦЕНТРУ БЕЗ ПЛАШКИ ===== */
 
 div[data-testid="stStatusWidget"] {
     position: fixed !important;
@@ -188,21 +188,21 @@ div[data-testid="stStatusWidget"] {
     flex-direction: row !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 12px !important;
+    gap: 10px !important;
 
-    padding: 14px 22px !important;
-    min-width: 150px !important;
-    min-height: 56px !important;
+    padding: 0 !important;
+    min-width: auto !important;
+    min-height: auto !important;
 
-    border-radius: 18px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 
-    background: rgba(156, 163, 175, 0.82) !important; /* более тёмный серый полупрозрачный */
-    color: #1f2937 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
 
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
-
-    opacity: 0.5 !important;
+    opacity: 1 !important;
     visibility: visible !important;
 }
 
@@ -210,7 +210,7 @@ div[data-testid="stStatusWidget"] {
 div[data-testid="stStatusWidget"]::after {
     content: "Загрузка";
     display: inline-block;
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     color: #1f2937;
     line-height: 1;
@@ -224,8 +224,8 @@ div[data-testid="stStatusWidget"] * {
 
 /* Размер иконки */
 div[data-testid="stStatusWidget"] svg {
-    width: 28px !important;
-    height: 28px !important;
+    width: 30px !important;
+    height: 30px !important;
 }
 
 /* Полностью скрываем кнопку Stop */
@@ -236,9 +236,10 @@ div[data-testid="stStatusWidget"] button {
 /* ===== АДАПТАЦИЯ ДЛЯ ТЕМНОЙ ТЕМЫ ===== */
 
 .stApp.stAppDark div[data-testid="stStatusWidget"] {
-    background: rgba(75, 85, 99, 0.72) !important; /* серый полупрозрачный для темной темы */
+    background: transparent !important;
     color: #ffffff !important;
-
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .stApp.stAppDark div[data-testid="stStatusWidget"]::after {
@@ -252,4 +253,3 @@ div[data-testid="stStatusWidget"] button {
 .stApp.stAppDark div[data-testid="stStatusWidget"] button {
     display: none !important;
 }
-
