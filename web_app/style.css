@@ -233,3 +233,23 @@ div[data-testid="stStatusWidget"] button {
     display: none !important;
 }
 
+/* ===== АДАПТАЦИЯ ДЛЯ ТЕМНОЙ ТЕМЫ ===== */
+
+.stApp.stAppDark div[data-testid="stStatusWidget"] {
+    background: transparent !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.stApp.stAppDark div[data-testid="stStatusWidget"]::after {
+    color: #ffffff !important;
+}
+
+.stApp.stAppDark div[data-testid="stStatusWidget"] * {
+    color: #ffffff !important;
+}
+
+.stApp.stAppDark div[data-testid="stStatusWidget"] button {
+    display: none !important;
+}
