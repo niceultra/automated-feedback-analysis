@@ -33,7 +33,7 @@ local_css("style.css")
 
 
 # 1. Открываем изображение с помощью PIL
-img = "./images/logo.svg"
+LOGO_SVG = os.path.join(BASE_DIR, "images", "logo.svg")
 # 2. Передаем объект изображения в конфигурацию
 st.set_page_config(
     page_title="ИнСайт Бот • Умная аналитика отзывов",
@@ -1225,7 +1225,7 @@ with st.sidebar:
 
     with col1:
         # Укажите путь к вашему логотипу. Ширину (width) подберите под себя
-        st.image("./images/logo.png", width=45)
+        st.image(LOGO_SVG, width=45)
 
     with col2:
         # Текст заголовка без эмодзи
