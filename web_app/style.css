@@ -208,7 +208,7 @@ div[data-testid="stStatusWidget"] {
 
 /* Надпись справа от иконки */
 div[data-testid="stStatusWidget"]::after {
-    content: "Загрузка";
+    content: "Загрузка...";
     display: inline-block;
     font-size: 16px;
     font-weight: 600;
@@ -219,7 +219,7 @@ div[data-testid="stStatusWidget"]::after {
 
 /* Цвет внутренних элементов */
 div[data-testid="stStatusWidget"] * {
-    color: #1f2937 !important;
+    color: #324259 !important;
 }
 
 /* Размер иконки */

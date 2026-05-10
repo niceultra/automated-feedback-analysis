@@ -1336,7 +1336,7 @@ if st.session_state.page == "Главная":
                 try:
                     products = parse_wb_products_input(wb_products_text)
 
-                    with st.spinner("Собираю отзывы Wildberries, запускаю BERT-модель и сохраняю результат..."):
+                    with st.spinner("Собираю отзывы Wildberries, запускаю BERT-модель и сохраняю результат, это может занять время..."):
                         raw_df, fetch_report = fetch_wb_reviews_dataframe(
                             products,
                             limit=int(wb_limit),
