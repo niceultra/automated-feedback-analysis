@@ -204,6 +204,8 @@ div[data-testid="stStatusWidget"] {
 
     opacity: 1 !important;
     visibility: visible !important;
+
+    color: var(--text-color) !important;
 }
 
 /* Надпись справа от иконки */
@@ -212,44 +214,30 @@ div[data-testid="stStatusWidget"]::after {
     display: inline-block;
     font-size: 16px;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-color) !important;
     line-height: 1;
     white-space: nowrap;
 }
 
 /* Цвет внутренних элементов */
 div[data-testid="stStatusWidget"] * {
-    color: #1f2937 !important;
+    color: var(--text-color) !important;
 }
 
 /* Размер иконки */
 div[data-testid="stStatusWidget"] svg {
     width: 30px !important;
     height: 30px !important;
+    color: var(--text-color) !important;
+}
+
+/* Принудительно перекрашиваем элементы SVG */
+div[data-testid="stStatusWidget"] svg * {
+    fill: currentColor !important;
+    stroke: currentColor !important;
 }
 
 /* Полностью скрываем кнопку Stop */
 div[data-testid="stStatusWidget"] button {
-    display: none !important;
-}
-
-/* ===== АДАПТАЦИЯ ДЛЯ ТЕМНОЙ ТЕМЫ ===== */
-
-.stApp.stAppDark div[data-testid="stStatusWidget"] {
-    background: transparent !important;
-    color: #ffffff !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-.stApp.stAppDark div[data-testid="stStatusWidget"]::after {
-    color: #ffffff !important;
-}
-
-.stApp.stAppDark div[data-testid="stStatusWidget"] * {
-    color: #ffffff !important;
-}
-
-.stApp.stAppDark div[data-testid="stStatusWidget"] button {
     display: none !important;
 }
