@@ -1505,11 +1505,6 @@ if st.session_state.page == "Главная":
     # --- ЛЕВАЯ КОЛОНКА: ОСНОВНОЙ СЦЕНАРИЙ — НОВЫЙ АНАЛИЗ ---
     with col_analyze:
         st.markdown("### Новый анализ товара")
-        st.caption(
-            "Введите артикул или ссылку Wildberries. Сервис соберёт отзывы, "
-            "определит тональность, выделит ключевые плюсы и минусы и сохранит результат."
-        )
-
         tab_wb_search, tab_file_upload = st.tabs(["Артикул / ссылка WB", "CSV / Excel"])
 
         with tab_wb_search:
