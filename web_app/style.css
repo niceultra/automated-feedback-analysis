@@ -212,6 +212,7 @@ div[data-testid="stStatusWidget"]::after {
     display: inline-block;
     font-size: 16px;
     font-weight: 600;
+    color: #324259;
     line-height: 1;
     white-space: nowrap;
 }
