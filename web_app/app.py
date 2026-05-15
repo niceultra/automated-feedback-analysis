@@ -273,14 +273,17 @@ def get_product_analytics(nm_id):
 def get_reviews(nm_id):
     try:
         conn = get_db_connection()
-        # Выбираем текст, тональность и уверенность модели
-        query = f"SELECT review_text, sentiment, confidence FROM reviews WHERE nm_id = '{nm_id}'"
-        df = pd.read_sql(query, conn)
+        query = """
+        SELECT review_text, sentiment, confidence 
+        FROM reviews 
+        WHERE nm_id = %s
+        """
+        df = pd.read_sql(query, conn, params=(str(nm_id),))
         conn.close()
         return df
-    except:
+    except Exception as e:
+        st.error(f"Ошибка при загрузке отзывов: {e}")
         return None
-
 
 def get_all_products():
     try:
@@ -395,6 +398,163 @@ def extract_strengths_weaknesses(summary_text):
         st.error(f"Ошибка при извлечении данных: {str(e)}")
 
     return strengths, weaknesses
+
+def parse_summary_stats(summary_text):
+    """Извлекает числовые показатели из текстового резюме товара."""
+    stats = {
+        "total": 0,
+        "positive_count": 0,
+        "negative_count": 0,
+        "neutral_count": 0,
+        "positive_share": 0.0,
+        "negative_share": 0.0,
+        "neutral_share": 0.0,
+    }
+
+    if not summary_text:
+        return stats
+
+    patterns = {
+        "total": r"Всего обработано отзывов:\s*(\d+)",
+        "positive": r"Позитивные отзывы:\s*(\d+)\s*\(([\d.,]+)%",
+        "negative": r"Негативные отзывы:\s*(\d+)\s*\(([\d.,]+)%",
+        "neutral": r"Нейтральные отзывы:\s*(\d+)\s*\(([\d.,]+)%",
+    }
+
+    total_match = re.search(patterns["total"], summary_text)
+    if total_match:
+        stats["total"] = int(total_match.group(1))
+
+    for key, count_field, share_field in [
+        ("positive", "positive_count", "positive_share"),
+        ("negative", "negative_count", "negative_share"),
+        ("neutral", "neutral_count", "neutral_share"),
+    ]:
+        match = re.search(patterns[key], summary_text)
+        if match:
+            stats[count_field] = int(match.group(1))
+            stats[share_field] = float(match.group(2).replace(",", "."))
+
+    return stats
+
+
+def build_marketing_recommendations(stats, strengths, weaknesses):
+    """Формирует понятные рекомендации для маркетолога."""
+    recommendations = []
+
+    positive_share = stats.get("positive_share", 0)
+    negative_share = stats.get("negative_share", 0)
+    total = stats.get("total", 0)
+
+    if total < 30:
+        recommendations.append(
+            "Данных пока немного: выводы лучше использовать как предварительные. "
+            "Для более точной картины желательно собрать больше отзывов."
+        )
+
+    if positive_share >= 80:
+        recommendations.append(
+            "У товара сильный позитивный фон. В рекламе можно делать акцент на доверии покупателей, качестве и подтверждённых преимуществах."
+        )
+    elif positive_share >= 60:
+        recommendations.append(
+            "Товар воспринимается преимущественно положительно, но в коммуникации стоит аккуратно закрывать возможные сомнения покупателей."
+        )
+    else:
+        recommendations.append(
+            "Позитивный фон выражен умеренно. Перед активным продвижением стоит проверить карточку товара, описание, ожидания покупателей и повторяющиеся претензии."
+        )
+
+    if negative_share >= 15:
+        recommendations.append(
+            "Доля негативных отзывов заметная. Рекомендуется использовать минусы как список возражений: уточнить описание, добавить предупреждения, улучшить инфографику и ответы на вопросы."
+        )
+    elif negative_share > 0:
+        recommendations.append(
+            "Негативные отзывы есть, но их доля невысокая. Их можно использовать для точечной доработки карточки и рекламных формулировок."
+        )
+    else:
+        recommendations.append(
+            "Существенный негатив по отзывам не выделен. Основной упор можно сделать на преимущества и сценарии использования товара."
+        )
+
+    if strengths:
+        recommendations.append(
+            "Главные преимущества для карточки товара: " + "; ".join(strengths[:3]) + "."
+        )
+
+    if weaknesses:
+        recommendations.append(
+            "Что стоит учесть в описании и рекламе: " + "; ".join(weaknesses[:3]) + "."
+        )
+
+    return recommendations
+
+
+def build_ad_brief(product_name, strengths, weaknesses, stats):
+    """Готовит краткий бриф для маркетолога."""
+    positive_share = stats.get("positive_share", 0)
+    negative_share = stats.get("negative_share", 0)
+
+    if positive_share >= 80:
+        tone = "уверенный, позитивный, с акцентом на качество и довольных покупателей"
+    elif negative_share >= 15:
+        tone = "аккуратный, объясняющий, с проработкой возражений"
+    else:
+        tone = "нейтрально-продающий, с акцентом на практическую пользу"
+
+    main_strengths = "; ".join(strengths[:5]) if strengths else "преимущества выражены слабо"
+    main_risks = "; ".join(weaknesses[:5]) if weaknesses else "существенные риски не выявлены"
+
+    return f"""Краткий маркетинговый бриф
+
+Товар: {product_name}
+
+Рекомендуемый тон коммуникации:
+{tone}
+
+Что выносить в рекламу:
+{main_strengths}
+
+Какие возражения закрывать:
+{main_risks}
+
+Рекомендация:
+Использовать сильные стороны в заголовках, карточке товара, инфографике и рекламных объявлениях. Слабые стороны не выносить напрямую в рекламу, а закрывать через уточняющие формулировки, честное описание комплектации, назначения и ожидаемого результата.
+"""
+
+
+def marketing_report_to_excel_bytes(product_name, current_sku, summary_text, reviews_df, strengths, weaknesses, recommendations):
+    """Формирует Excel-отчёт для скачивания маркетологом."""
+    output = io.BytesIO()
+
+    summary_rows = [
+        ["Товар", product_name],
+        ["Артикул", current_sku],
+        ["", ""],
+        ["Сводная аналитика", summary_text],
+        ["", ""],
+        ["Ключевые плюсы", "\n".join(strengths) if strengths else "Не выявлено"],
+        ["Ключевые минусы", "\n".join(weaknesses) if weaknesses else "Не выявлено"],
+        ["", ""],
+        ["Рекомендации", "\n".join(recommendations) if recommendations else "Нет рекомендаций"],
+    ]
+
+    summary_df = pd.DataFrame(summary_rows, columns=["Показатель", "Значение"])
+
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        summary_df.to_excel(writer, index=False, sheet_name="summary")
+
+        if reviews_df is not None and not reviews_df.empty:
+            export_reviews = reviews_df.copy()
+            export_reviews["sentiment_label"] = export_reviews["sentiment"].map({
+                0: "Нейтральный",
+                1: "Негативный",
+                2: "Позитивный"
+            })
+            export_reviews.to_excel(writer, index=False, sheet_name="reviews")
+
+    return output.getvalue()
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
     # Соответствие согласно Ledger: 1-neg, 2-pos, 0-neutral
@@ -1252,11 +1412,12 @@ with st.sidebar:
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
-    st.title("Анализ отзывов Wildberries")
+    st.title("Поиск и анализ отзывов Wildberries")
     st.markdown(
         "<p style='color: #28a745; font-style: italic; margin-bottom: 25px;'>"
-        "Введите артикул или ссылку на товар — сервис сам соберёт отзывы, "
-        "проанализирует их BERT-моделью и сохранит результат в базу."
+        "Введите артикул или ссылку на товар. Сервис соберёт отзывы Wildberries, "
+        "определит тональность, выделит ключевые плюсы и минусы, а затем поможет "
+        "подготовить рекламный текст и маркетинговые выводы."
         "</p>",
         unsafe_allow_html=True
     )
@@ -1298,6 +1459,11 @@ if st.session_state.page == "Главная":
         tab_wb_search, tab_file_upload = st.tabs(["Артикул / ссылка WB", "CSV / Excel"])
 
         with tab_wb_search:
+            st.info(
+                "Основной сценарий: вставьте артикул или ссылку Wildberries. "
+                "После запуска сервис автоматически соберёт отзывы, обработает их BERT-моделью "
+                "и сохранит результат в базу."
+            )
             wb_products_text = st.text_area(
                 "Артикул или ссылка Wildberries",
                 placeholder=(
@@ -1606,6 +1772,42 @@ elif st.session_state.page == "Аналитика":
                 # Извлекаем сильные и слабые стороны
                 strengths, weaknesses = extract_strengths_weaknesses(summary_text)
 
+                stats = parse_summary_stats(summary_text)
+                recommendations = build_marketing_recommendations(stats, strengths, weaknesses)
+                ad_brief = build_ad_brief(product_name, strengths, weaknesses, stats)
+
+                st.markdown("### Маркетинговая интерпретация")
+
+                kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+                kpi1.metric("Всего отзывов", stats["total"])
+                kpi2.metric("Позитив", f'{stats["positive_share"]}%')
+                kpi3.metric("Негатив", f'{stats["negative_share"]}%')
+                kpi4.metric("Нейтрально", f'{stats["neutral_share"]}%')
+
+                with st.expander("Рекомендации для маркетолога", expanded=True):
+                    for rec in recommendations:
+                        st.markdown(f"- {rec}")
+
+                with st.expander("Краткий рекламный бриф", expanded=False):
+                    st.text(ad_brief)
+
+                st.download_button(
+                    label="Скачать Excel-отчёт для маркетолога",
+                    data=marketing_report_to_excel_bytes(
+                        product_name,
+                        current_sku,
+                        summary_text,
+                        reviews_df,
+                        strengths,
+                        weaknesses,
+                        recommendations
+                    ),
+                    file_name=f"marketing_report_{current_sku}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True,
+                    icon=":material/download:"
+                )
+
                 # Проверяем, есть ли данные для генерации
                 # Проверяем, есть ли данные для генерации
                 if strengths or weaknesses:
@@ -1685,14 +1887,20 @@ elif st.session_state.page == "Аналитика":
 elif st.session_state.page == "О проекте":
     st.title("О проекте")
     st.markdown("""
-    **InsightCopy AI** — это инструмент для глубокого NLP-анализа отзывов. 
-    Мы используем современные архитектуры трансформеров для обеспечения **аналитической точности**.
+    **ИнСайт Бот** — это сервис для анализа отзывов Wildberries и подготовки маркетинговых материалов на основе реальных мнений покупателей.
 
-    **Стек технологий:**
-    *   **LLM Core:** Модели семейства BERT для классификации тональности.
-    *   **Backend:** PostgreSQL (Managed) для хранения результатов.
-    *   **Visuals:** Plotly/D3.js для интерактивных графиков.
-    *   **Frontend:** Streamlit для быстрого доступа к инсайтам.
+    Сервис помогает маркетологу:
+    - быстро собрать отзывы по артикулу или ссылке;
+    - определить общую тональность отзывов;
+    - выделить ключевые преимущества и слабые места товара;
+    - понять, какие возражения покупателей нужно закрывать;
+    - подготовить рекламный текст для объявления или карточки товара;
+    - сохранить результаты анализа в базе данных.
+
+    **Используемые технологии:**
+    - **BERT-модель** — классификация отзывов по тональности;
+    - **SHAP-анализ** — выделение наиболее информативных отзывов;
+    - **GigaChat API** — генерация рекламного текста;
+    - **PostgreSQL** — хранение товаров, отзывов и результатов анализа;
+    - **Streamlit** — веб-интерфейс сервиса.
     """)
-    st.divider()
-    st.image("https://huggingface.co/front/assets/huggingface_logo-noborder.svg", width=80)
