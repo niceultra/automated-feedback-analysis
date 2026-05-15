@@ -60,6 +60,7 @@ DB_PASS = st.secrets["DB_PASS"]
 # При необходимости можно переопределить в .streamlit/secrets.toml:
 # HF_MODEL_ID = "ваш_логин/ваша_модель"
 MODEL_ID = st.secrets.get("HF_MODEL_ID", "fsed/bert-review-sentiment-classifier")
+MIN_REVIEWS_FOR_ANALYSIS = 500
 
 
 
@@ -1012,24 +1013,77 @@ def prepare_uploaded_reviews_dataframe(df):
 
 
 def analyze_uploaded_reviews(df):
-    """Анализирует отзывы из файла BERT-моделью и готовит сводки по товарам."""
+    """Анализирует отзывы BERT-моделью и готовит сводки по товарам.
+
+    Если по товару меньше MIN_REVIEWS_FOR_ANALYSIS отзывов,
+    товар не анализируется и не сохраняется в базу.
+    """
     prepared_df = prepare_uploaded_reviews_dataframe(df)
+
+    review_counts = prepared_df.groupby("nm_id").size()
+
+    valid_nm_ids = review_counts[
+        review_counts >= MIN_REVIEWS_FOR_ANALYSIS
+    ].index.astype(str).tolist()
+
+    skipped_items = review_counts[
+        review_counts < MIN_REVIEWS_FOR_ANALYSIS
+    ]
+
+    if not valid_nm_ids:
+        details = "\n".join(
+            f"— {nm_id}: {count} отзывов"
+            for nm_id, count in skipped_items.items()
+        )
+
+        raise ValueError(
+            f"Недостаточно отзывов для анализа. "
+            f"Минимальный порог — {MIN_REVIEWS_FOR_ANALYSIS} отзывов на товар.\n\n"
+            f"Найдено:\n{details}\n\n"
+            f"Товар не был проанализирован и не сохранён в базу данных."
+        )
+
+    prepared_df = prepared_df[
+        prepared_df["nm_id"].astype(str).isin(valid_nm_ids)
+    ].reset_index(drop=True)
+
+    if not skipped_items.empty:
+        skipped_text = "\n".join(
+            f"— {nm_id}: {count} отзывов"
+            for nm_id, count in skipped_items.items()
+        )
+
+        st.warning(
+            f"Некоторые товары пропущены, потому что по ним меньше "
+            f"{MIN_REVIEWS_FOR_ANALYSIS} отзывов:\n\n{skipped_text}"
+        )
+
     texts = prepared_df["review_text"].tolist()
 
     sentiments, confidences = predict_sentiment_batch(texts)
     prepared_df["sentiment"] = sentiments
     prepared_df["confidence"] = confidences
-    prepared_df["sentiment_label"] = prepared_df["sentiment"].map({0: "Нейтральный", 1: "Негативный", 2: "Позитивный"})
+    prepared_df["sentiment_label"] = prepared_df["sentiment"].map({
+        0: "Нейтральный",
+        1: "Негативный",
+        2: "Позитивный"
+    })
 
     product_summaries = []
+
     for nm_id, group in prepared_df.groupby("nm_id"):
         first_row = group.iloc[0]
+
         product_summaries.append({
             "nm_id": str(nm_id),
             "product_name": str(first_row["product_name"]),
             "category_name": str(first_row["category_name"]),
             "product_url": str(first_row["product_url"]),
-            "summary_text": build_summary_text(str(first_row["product_name"]), group, str(first_row["category_name"])),
+            "summary_text": build_summary_text(
+                str(first_row["product_name"]),
+                group,
+                str(first_row["category_name"])
+            ),
             "chart_html": ""
         })
 
@@ -1459,10 +1513,9 @@ if st.session_state.page == "Главная":
         tab_wb_search, tab_file_upload = st.tabs(["Артикул / ссылка WB", "CSV / Excel"])
 
         with tab_wb_search:
-            st.info(
-                "Основной сценарий: вставьте артикул или ссылку Wildberries. "
-                "После запуска сервис автоматически соберёт отзывы, обработает их BERT-моделью "
-                "и сохранит результат в базу."
+            st.caption(
+                f"Важно: анализ запускается только для товаров, у которых найдено не менее "
+                f"{MIN_REVIEWS_FOR_ANALYSIS} содержательных отзывов. Это нужно, чтобы выводы были статистически полезными."
             )
             wb_products_text = st.text_area(
                 "Артикул или ссылка Wildberries",
@@ -1527,8 +1580,10 @@ if st.session_state.page == "Главная":
                         f"по {len(product_summaries)} товар(ам). Результат сохранён в базу."
                     )
 
+
                 except Exception as e:
-                    st.error(f"Ошибка при сборе или анализе отзывов: {e}")
+
+                    st.error(str(e))
 
             if "wb_fetch_report" in st.session_state:
                 with st.expander("Что было найдено на Wildberries", expanded=False):
@@ -1685,7 +1740,7 @@ elif st.session_state.page == "Аналитика":
             if not product_df.empty:
                 product_name = get_product_name_by_sku(product_df, current_sku)
 
-            st.markdown(f"#### 📊 Отчет по товару: {product_name}")
+            st.markdown(f"#### Отчет по товару: {product_name}")
 
 
             # СОЗДАЕМ ДВЕ КОЛОНКИ: ГРАФИК СЛЕВА, ТЕКСТ СПРАВА
@@ -1693,7 +1748,7 @@ elif st.session_state.page == "Аналитика":
 
             # --- ЛЕВАЯ КОЛОНКА: КРУГОВАЯ ДИАГРАММА ---
             with col_chart:
-                st.markdown('<div style="text-align: center; width: 100%; margin: 0 auto;">📈Распределение мнений по тональности</div>', unsafe_allow_html=True)
+                st.markdown('<div style="text-align: center; width: 100%; margin: 0 auto;">Распределение мнений по тональности</div>', unsafe_allow_html=True)
 
                 reviews_df = get_reviews(current_sku)
 
@@ -1766,7 +1821,7 @@ elif st.session_state.page == "Аналитика":
                 st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
 
                 # --- ГЕНЕРАЦИЯ МАРКЕТИНГОВОГО КОНТЕНТА ---
-                st.markdown('<div class="section-title">💡 Генерация маркетингового контента</div>',
+                st.markdown('<div class="section-title">Генерация маркетингового контента</div>',
                             unsafe_allow_html=True)
 
                 # Извлекаем сильные и слабые стороны
@@ -1870,7 +1925,7 @@ elif st.session_state.page == "Аналитика":
                             st.session_state.content_generated = True
                             st.rerun()
             # 3. Исходные отзывы
-            with st.expander("🔍 Подробная статистика отзывов"):
+            with st.expander("Подробная статистика отзывов"):
                 if reviews_df is not None and not reviews_df.empty:
                     # Применяем цветовое форматирование к тональности
                     styled_reviews = reviews_df.style.map(color_sentiment, subset=['sentiment'])
