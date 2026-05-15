@@ -424,7 +424,10 @@ def extract_strengths_weaknesses(summary_text):
     return strengths, weaknesses
 
 def parse_summary_stats(summary_text):
-    """Извлекает числовые показатели из текстового резюме товара."""
+    """
+    Извлекает числовые показатели из текстового резюме товара.
+    Поддерживает новый и старый формат summary_text.
+    """
     stats = {
         "total": 0,
         "positive_count": 0,
@@ -438,29 +441,81 @@ def parse_summary_stats(summary_text):
     if not summary_text:
         return stats
 
-    patterns = {
-        "total": r"Всего обработано отзывов:\s*(\d+)",
-        "positive": r"Позитивные отзывы:\s*(\d+)\s*\(([\d.,]+)%",
-        "negative": r"Негативные отзывы:\s*(\d+)\s*\(([\d.,]+)%",
-        "neutral": r"Нейтральные отзывы:\s*(\d+)\s*\(([\d.,]+)%",
-    }
+    text = str(summary_text)
+    text = re.sub(r"\s+", " ", text).strip()
 
-    total_match = re.search(patterns["total"], summary_text)
-    if total_match:
-        stats["total"] = int(total_match.group(1))
+    def to_float(value):
+        try:
+            return float(str(value).replace(",", "."))
+        except Exception:
+            return 0.0
 
-    for key, count_field, share_field in [
-        ("positive", "positive_count", "positive_share"),
-        ("negative", "negative_count", "negative_share"),
-        ("neutral", "neutral_count", "neutral_share"),
-    ]:
-        match = re.search(patterns[key], summary_text)
+    # 1. Всего отзывов: поддержка старого и нового формата
+    total_patterns = [
+        r"Всего обработано отзывов:\s*(\d+)",
+        r"Всего отзывов:\s*(\d+)",
+    ]
+
+    for pattern in total_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
-            stats[count_field] = int(match.group(1))
-            stats[share_field] = float(match.group(2).replace(",", "."))
+            stats["total"] = int(match.group(1))
+            break
+
+    # 2. Позитивные отзывы: новый формат + старый формат
+    positive_patterns = [
+        r"Позитивные отзывы:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+        r"Позитивных:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+        r"Позитивные:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+    ]
+
+    for pattern in positive_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            stats["positive_count"] = int(match.group(1))
+            stats["positive_share"] = to_float(match.group(2))
+            break
+
+    # 3. Негативные отзывы: новый формат + старый формат
+    negative_patterns = [
+        r"Негативные отзывы:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+        r"Негативных:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+        r"Негативные:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+    ]
+
+    for pattern in negative_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            stats["negative_count"] = int(match.group(1))
+            stats["negative_share"] = to_float(match.group(2))
+            break
+
+    # 4. Нейтральные отзывы: новый формат + старый формат
+    neutral_patterns = [
+        r"Нейтральные отзывы:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+        r"Нейтральных:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+        r"Нейтральные:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
+    ]
+
+    for pattern in neutral_patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            stats["neutral_count"] = int(match.group(1))
+            stats["neutral_share"] = to_float(match.group(2))
+            break
+
+    # 5. Если проценты не найдены, но есть количество — пересчитываем вручную
+    if stats["total"] > 0:
+        if stats["positive_share"] == 0.0 and stats["positive_count"] > 0:
+            stats["positive_share"] = round(stats["positive_count"] / stats["total"] * 100, 1)
+
+        if stats["negative_share"] == 0.0 and stats["negative_count"] > 0:
+            stats["negative_share"] = round(stats["negative_count"] / stats["total"] * 100, 1)
+
+        if stats["neutral_share"] == 0.0 and stats["neutral_count"] > 0:
+            stats["neutral_share"] = round(stats["neutral_count"] / stats["total"] * 100, 1)
 
     return stats
-
 
 def build_marketing_recommendations(stats, strengths, weaknesses):
     """Формирует понятные рекомендации для маркетолога."""
