@@ -13,3 +13,4 @@ safetensors
 huggingface_hub
 openpyxl
 numpy
+SQLAlchemy

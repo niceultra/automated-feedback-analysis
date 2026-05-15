@@ -56,10 +56,29 @@ DB_NAME = st.secrets["DB_NAME"]
 DB_USER = st.secrets["DB_USER"]
 DB_PASS = st.secrets["DB_PASS"]
 
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import URL
+
+
+@st.cache_resource(show_spinner=False)
+def get_db_engine():
+    db_url = URL.create(
+        "postgresql+psycopg2",
+        username=DB_USER,
+        password=DB_PASS,
+        host=DB_HOST,
+        port=6432,
+        database=DB_NAME,
+        query={"sslmode": "require"}
+    )
+
+    return create_engine(db_url, pool_pre_ping=True)
+
 # Модель BERT для анализа тональности отзывов.
 # При необходимости можно переопределить в .streamlit/secrets.toml:
 # HF_MODEL_ID = "ваш_логин/ваша_модель"
 MODEL_ID = st.secrets.get("HF_MODEL_ID", "fsed/bert-review-sentiment-classifier")
+HF_TOKEN = st.secrets.get("HF_TOKEN", None)
 MIN_REVIEWS_FOR_ANALYSIS = 500
 
 
@@ -273,26 +292,30 @@ def get_product_analytics(nm_id):
 
 def get_reviews(nm_id):
     try:
-        conn = get_db_connection()
-        query = """
-        SELECT review_text, sentiment, confidence 
-        FROM reviews 
-        WHERE nm_id = %s
-        """
-        df = pd.read_sql(query, conn, params=(str(nm_id),))
-        conn.close()
+        query = text("""
+            SELECT review_text, sentiment, confidence
+            FROM reviews
+            WHERE nm_id = :nm_id
+        """)
+
+        with get_db_engine().connect() as conn:
+            df = pd.read_sql(query, conn, params={"nm_id": str(nm_id)})
+
         return df
+
     except Exception as e:
         st.error(f"Ошибка при загрузке отзывов: {e}")
         return None
 
 def get_all_products():
     try:
-        conn = get_db_connection()
-        # Используем обновленные названия колонок: category_name
-        df = pd.read_sql("SELECT nm_id, category_name, product_name, product_url FROM products", conn)
-        conn.close()
+        query = text("""
+            SELECT nm_id, category_name, product_name, product_url
+            FROM products
+        """)
 
+        with get_db_engine().connect() as conn:
+            df = pd.read_sql(query, conn)
         # Важно: после загрузки данных из WB артикул может прийти из БД числом,
         # а в session_state хранится строкой. Приводим всё к строкам, чтобы поиск
         # выбранного товара не падал с IndexError.
@@ -651,8 +674,10 @@ def load_sentiment_model():
     import torch
     from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL_ID)
+    hf_kwargs = {"token": HF_TOKEN} if HF_TOKEN else {}
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, **hf_kwargs)
+    model = AutoModelForSequenceClassification.from_pretrained(MODEL_ID, **hf_kwargs)
     model.eval()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -1455,13 +1480,13 @@ with st.sidebar:
     st.caption("Поиск и анализ отзывов WB")
     st.divider()
 
-    if st.button("Поиск и анализ", icon=":material/search:", use_container_width=True):
+    if st.button("Поиск и анализ", icon=":material/search:", width="stretch"):
         st.session_state.page = "Главная"
 
-    if st.button("Аналитика", icon=":material/monitoring:", use_container_width=True):
+    if st.button("Аналитика", icon=":material/monitoring:", width="stretch"):
         st.session_state.page = "Аналитика"
 
-    if st.button("О проекте", icon=":material/info:", use_container_width=True):
+    if st.button("О проекте", icon=":material/info:", width="stretch"):
         st.session_state.page = "О проекте"
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
@@ -1480,7 +1505,7 @@ if st.session_state.page == "Главная":
     m1, m2, m3 = st.columns(3)
     m1.metric("Позиций в базе", f'{len(product_df)}')
     m2.metric("Активность системы", "Высокая")
-    m3.metric("Точность модели", "94%", delta="↑ 2%")
+    m3.metric("Точность нейро-анализа", "94%", delta="↑ 2%")
     st.divider()
 
     st.markdown(
@@ -1544,13 +1569,13 @@ if st.session_state.page == "Главная":
                     "Запустить анализ товара",
                     type="primary",
                     icon=":material/search:",
-                    use_container_width=True,
+                    width="stretch",
                     key="process_wb_search"
             ):
                 try:
                     products = parse_wb_products_input(wb_products_text)
 
-                    with st.spinner("Собираю отзывы Wildberries, запускаю BERT-модель и сохраняю результат..."):
+                    with st.spinner("Собираю отзывы Wildberries, запускаю нейро-анализ и сохраняю результат..."):
                         raw_df, fetch_report = fetch_wb_reviews_dataframe(
                             products,
                             limit=int(wb_limit),
@@ -1582,7 +1607,7 @@ if st.session_state.page == "Главная":
 
             if "wb_fetch_report" in st.session_state:
                 with st.expander("Что было найдено на Wildberries", expanded=False):
-                    st.dataframe(pd.DataFrame(st.session_state.wb_fetch_report), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(st.session_state.wb_fetch_report), width="stretch", hide_index=True)
 
         with tab_file_upload:
             st.markdown("##### Анализ готового файла")
@@ -1606,7 +1631,7 @@ if st.session_state.page == "Главная":
                             f"Проанализировать и сохранить: {uploaded_file.name}",
                             type="primary",
                             icon=":material/database_upload:",
-                            use_container_width=True,
+                            width="stretch",
                             key=f"process_upload_{uploaded_file.name}"
                     ):
                         try:
@@ -1635,13 +1660,13 @@ if st.session_state.page == "Главная":
                 data=dataframe_to_excel_bytes(st.session_state.upload_result_df),
                 file_name="analyzed_reviews.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True,
+                width="stretch",
                 icon=":material/download:"
             )
 
             if st.button(
                     "Открыть аналитику по последнему обработанному товару",
-                    use_container_width=True,
+                    width="stretch",
                     icon=":material/monitoring:"
             ):
                 st.session_state.page = "Аналитика"
@@ -1688,7 +1713,7 @@ if st.session_state.page == "Главная":
                                     row['product_name'],
                                     icon=icon_name,
                                     key=f"btn_{row['nm_id']}",
-                                    use_container_width=True
+                                    width="stretch"
                             ):
                                 st.session_state.current_sku = normalize_sku(row['nm_id'])
                                 st.session_state.current_category = category
@@ -1699,7 +1724,7 @@ if st.session_state.page == "Главная":
                     selected_name = get_product_name_by_sku(product_df, st.session_state.current_sku)
                     st.info(f"Выбран товар из базы: **{selected_name}**")
 
-                    if st.button("Открыть сохранённую аналитику", type="primary", use_container_width=True):
+                    if st.button("Открыть сохранённую аналитику", type="primary", width="stretch"):
                         st.session_state.page = "Аналитика"
                         st.rerun()
         else:
@@ -1709,13 +1734,13 @@ if st.session_state.page == "Главная":
 
     # Таблица каталога
     st.subheader("База уже проанализированных товаров")
-    st.caption("Этот список пополняется автоматически после анализа по артикулу, ссылке или загруженному файлу.")
+    st.caption("Этот список пополняется автоматически после анализа по артикулу или ссылке или загруженному файлу.")
 
     if not product_df.empty:
         display_list = product_df[['nm_id', 'product_name', 'category_name']].rename(
             columns={'nm_id': 'Артикул', 'product_name': 'Наименование', 'category_name': 'Категория'}
         )
-        st.dataframe(display_list, use_container_width=True, hide_index=True)
+        st.dataframe(display_list, width="stretch", hide_index=True)
     else:
         st.info("Пока нет сохранённых товаров. Запустите первый анализ через форму выше.")
 
@@ -1798,7 +1823,7 @@ elif st.session_state.page == "Аналитика":
                         height=300
                     )
 
-                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                    st.plotly_chart(fig, width="stretch", config={'displayModeBar': False})
 
                     # Кастомная легенда
                     st.markdown(f"""
@@ -1854,7 +1879,7 @@ elif st.session_state.page == "Аналитика":
                     ),
                     file_name=f"marketing_report_{current_sku}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
+                    width="stretch",
                     icon=":material/download:"
                 )
 
@@ -1868,7 +1893,7 @@ elif st.session_state.page == "Аналитика":
                             "Сгенерировать текст для объявления",
                             type="primary",
                             icon=":material/campaign:",
-                            use_container_width=True,
+                            width="stretch",
                             key="generate_ad_text"
                     ):
                         with st.spinner("Генерирую рекламный текст для объявления..."):
@@ -1901,7 +1926,7 @@ elif st.session_state.page == "Аналитика":
                             data=download_text.encode("utf-8"),
                             file_name=f"ad_text_{current_sku}.txt",
                             mime="text/plain",
-                            use_container_width=True,
+                            width="stretch",
                             icon=":material/download:",
                             key="download_ad_text"
                         )
@@ -1909,7 +1934,7 @@ elif st.session_state.page == "Аналитика":
                     with col2:
                         if st.button(
                                 "Сгенерировать другой вариант",
-                                use_container_width=True,
+                                width="stretch",
                                 icon=":material/refresh:",
                                 key="regenerate_ad_text"
                         ):
@@ -1924,7 +1949,7 @@ elif st.session_state.page == "Аналитика":
                 if reviews_df is not None and not reviews_df.empty:
                     # Применяем цветовое форматирование к тональности
                     styled_reviews = reviews_df.style.map(color_sentiment, subset=['sentiment'])
-                    st.dataframe(styled_reviews, use_container_width=True)
+                    st.dataframe(styled_reviews, width="stretch")
                 else:
                     st.info("Отзывы не найдены.")
         else:
