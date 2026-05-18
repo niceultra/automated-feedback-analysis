@@ -59,6 +59,7 @@ MODEL_ID = st.secrets.get("HF_MODEL_ID", "fsed/bert-review-sentiment-classifier"
 HF_TOKEN = st.secrets.get("HF_TOKEN", None)
 MIN_REVIEWS_FOR_ANALYSIS = 400
 
+
 def generate_marketing_content(product_name, strengths, weaknesses):
     """Генерирует маркетинговый комплект через GigaChat."""
     client_id = st.secrets.get("GIGACHAT_CLIENT_ID", None)
