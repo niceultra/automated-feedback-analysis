@@ -3,19 +3,22 @@ import io
 import re
 import gzip
 import json
+import time
 import streamlit as st
 import pandas as pd
-import psycopg2
 from PIL import Image
 import plotly.express as px
-import requests
-import uuid
-import time
-from requests.exceptions import SSLError, ConnectionError, Timeout
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
 from services.gigachat_service import generate_marketing_content_with_gigachat
+from services.db_service import (
+    get_all_products,
+    get_reviews,
+    get_product_summary,
+    save_uploaded_analysis_to_db,
+)
 
 def local_css(file_name):
     # Получаем абсолютный путь к директории, где лежит сам скрипт
@@ -50,29 +53,6 @@ if 'current_sku' not in st.session_state:
 if 'current_category' not in st.session_state:
     st.session_state.current_category = None
 
-# --- ДАННЫЕ ПОДКЛЮЧЕНИЯ ---
-DB_HOST = st.secrets["DB_HOST"]
-DB_NAME = st.secrets["DB_NAME"]
-DB_USER = st.secrets["DB_USER"]
-DB_PASS = st.secrets["DB_PASS"]
-
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
-
-
-@st.cache_resource(show_spinner=False)
-def get_db_engine():
-    db_url = URL.create(
-        "postgresql+psycopg2",
-        username=DB_USER,
-        password=DB_PASS,
-        host=DB_HOST,
-        port=6432,
-        database=DB_NAME,
-        query={"sslmode": "require"}
-    )
-
-    return create_engine(db_url, pool_pre_ping=True)
 
 # Модель BERT для анализа тональности отзывов.
 # При необходимости можно переопределить в .streamlit/secrets.toml:
@@ -93,42 +73,6 @@ def get_db_connection():
         port=6432,
         sslmode='require'
     )
-def request_with_retries(method, url, max_attempts=4, timeout=60, **kwargs):
-    """
-    Выполняет HTTP-запрос с повторными попытками.
-    Нужно для GigaChat, потому что соединение иногда сбрасывается сервером.
-    """
-    last_error = None
-
-    for attempt in range(1, max_attempts + 1):
-        try:
-            response = requests.request(
-                method=method,
-                url=url,
-                timeout=timeout,
-                **kwargs
-            )
-
-            # Повторяем запрос при временных ошибках сервера
-            if response.status_code in (429, 500, 502, 503, 504):
-                last_error = f"HTTP {response.status_code}: {response.text[:300]}"
-
-                if attempt < max_attempts:
-                    time.sleep(2 * attempt)
-                    continue
-
-            return response
-
-        except (SSLError, ConnectionError, Timeout) as e:
-            last_error = e
-
-            if attempt < max_attempts:
-                time.sleep(2 * attempt)
-                continue
-
-            raise
-
-    raise RuntimeError(f"Не удалось выполнить запрос после нескольких попыток: {last_error}")
 
 def generate_marketing_content(product_name, strengths, weaknesses):
     """Генерирует маркетинговый комплект через GigaChat."""
@@ -142,103 +86,6 @@ def generate_marketing_content(product_name, strengths, weaknesses):
         client_id=client_id,
         client_secret=client_secret,
     )
-
-def get_product_analytics(nm_id):
-    """Получает и текст резюме, и HTML-код графика"""
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT summary_text, chart_html FROM product_summary WHERE nm_id = %s", (str(nm_id),))
-        result = cursor.fetchone()
-        conn.close()
-        return result if result else (None, None)
-    except:
-        return None, None
-
-
-def get_reviews(nm_id):
-    try:
-        query = text("""
-            SELECT review_text, sentiment, confidence
-            FROM reviews
-            WHERE nm_id = :nm_id
-        """)
-
-        with get_db_engine().connect() as conn:
-            df = pd.read_sql(query, conn, params={"nm_id": str(nm_id)})
-
-        return df
-
-    except Exception as e:
-        st.error(f"Ошибка при загрузке отзывов: {e}")
-        return None
-
-def get_all_products():
-    try:
-        query = text("""
-            SELECT nm_id, category_name, product_name, product_url
-            FROM products
-        """)
-
-        with get_db_engine().connect() as conn:
-            df = pd.read_sql(query, conn)
-        # Важно: после загрузки данных из WB артикул может прийти из БД числом,
-        # а в session_state хранится строкой. Приводим всё к строкам, чтобы поиск
-        # выбранного товара не падал с IndexError.
-        if not df.empty:
-            df["nm_id"] = df["nm_id"].astype(str).str.strip()
-            df["category_name"] = df["category_name"].fillna("Без категории").astype(str).str.strip()
-            df["product_name"] = df["product_name"].fillna("").astype(str).str.strip()
-            df["product_url"] = df["product_url"].fillna("").astype(str).str.strip()
-            df.loc[df["product_name"] == "", "product_name"] = "Товар " + df["nm_id"]
-            df.loc[df["category_name"] == "", "category_name"] = "Без категории"
-
-        return df
-    except Exception as e:
-        st.error(f"Ошибка при загрузке списка товаров: {e}")
-        return pd.DataFrame(columns=['nm_id', 'category_name', 'product_name', 'product_url'])
-
-
-def get_product_summary(nm_id):
-    """
-    Получает полную аналитику товара из базы данных
-
-    Args:
-        nm_id (str): Артикул товара
-
-    Returns:
-        dict: Словарь с данными аналитики
-    """
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Выбираем необходимые колонки
-        query = """
-        SELECT 
-            summary_text,
-            chart_html
-        FROM 
-            product_summary
-        WHERE 
-            nm_id = %s
-        """
-        cursor.execute(query, (str(nm_id),))
-        result = cursor.fetchone()
-
-        conn.close()
-
-        if result:
-            return {
-                'summary_text': result[0],
-                'chart_html': result[1]
-            }
-        else:
-            return None
-    except Exception as e:
-        st.error(f"Ошибка при получении аналитики: {str(e)}")
-        return None
-
 
 def extract_strengths_weaknesses(summary_text):
     """
@@ -1034,83 +881,6 @@ def analyze_uploaded_reviews(df):
         })
 
     return prepared_df, product_summaries
-
-
-def save_uploaded_analysis_to_db(analyzed_df, product_summaries):
-    """Сохраняет товары, отзывы и сводную аналитику в PostgreSQL."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    try:
-        for item in product_summaries:
-            nm_id = item["nm_id"]
-
-            cursor.execute("SELECT 1 FROM products WHERE nm_id = %s", (nm_id,))
-            if cursor.fetchone():
-                cursor.execute(
-                    """
-                    UPDATE products
-                    SET category_name = %s,
-                        product_name = %s,
-                        product_url = %s
-                    WHERE nm_id = %s
-                    """,
-                    (item["category_name"], item["product_name"], item["product_url"], nm_id)
-                )
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO products (nm_id, category_name, product_name, product_url)
-                    VALUES (%s, %s, %s, %s)
-                    """,
-                    (nm_id, item["category_name"], item["product_name"], item["product_url"])
-                )
-
-            cursor.execute("SELECT 1 FROM product_summary WHERE nm_id = %s", (nm_id,))
-            if cursor.fetchone():
-                cursor.execute(
-                    """
-                    UPDATE product_summary
-                    SET summary_text = %s,
-                        chart_html = %s
-                    WHERE nm_id = %s
-                    """,
-                    (item["summary_text"], item["chart_html"], nm_id)
-                )
-            else:
-                cursor.execute(
-                    """
-                    INSERT INTO product_summary (nm_id, summary_text, chart_html)
-                    VALUES (%s, %s, %s)
-                    """,
-                    (nm_id, item["summary_text"], item["chart_html"])
-                )
-
-            # Для загруженного товара заменяем старые отзывы новыми, чтобы аналитика не дублировалась.
-            cursor.execute("DELETE FROM reviews WHERE nm_id = %s", (nm_id,))
-
-        for _, row in analyzed_df.iterrows():
-            cursor.execute(
-                """
-                INSERT INTO reviews (nm_id, review_text, sentiment, confidence)
-                VALUES (%s, %s, %s, %s)
-                """,
-                (
-                    str(row["nm_id"]),
-                    str(row["review_text"]),
-                    int(row["sentiment"]),
-                    float(row["confidence"])
-                )
-            )
-
-        conn.commit()
-
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        cursor.close()
-        conn.close()
 
 
 def dataframe_to_excel_bytes(df):
