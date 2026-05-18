@@ -19,6 +19,7 @@ certifi>=2024.8.30
 
 # Machine learning and NLP
 torch>=2.3,<3.0
+torchvision>=0.18,<1.0
 transformers>=4.44,<5.0
 safetensors>=0.4,<1.0
 huggingface_hub>=0.24,<1.0
