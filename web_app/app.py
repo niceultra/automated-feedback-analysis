@@ -15,7 +15,7 @@ from requests.exceptions import SSLError, ConnectionError, Timeout
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-
+from services.gigachat_service import generate_marketing_content_with_gigachat
 
 def local_css(file_name):
     # Получаем абсолютный путь к директории, где лежит сам скрипт
@@ -131,143 +131,17 @@ def request_with_retries(method, url, max_attempts=4, timeout=60, **kwargs):
     raise RuntimeError(f"Не удалось выполнить запрос после нескольких попыток: {last_error}")
 
 def generate_marketing_content(product_name, strengths, weaknesses):
-    """
-    Генерирует маркетинговый отчет с использованием GigaChat API
-    """
-    # Проверка наличия необходимых секретов
-    required_secrets = ["GIGACHAT_CLIENT_ID", "GIGACHAT_CLIENT_SECRET"]
-    missing_secrets = [s for s in required_secrets if s not in st.secrets]
+    """Генерирует маркетинговый комплект через GigaChat."""
+    client_id = st.secrets.get("GIGACHAT_CLIENT_ID", None)
+    client_secret = st.secrets.get("GIGACHAT_CLIENT_SECRET", None)
 
-    if missing_secrets:
-        return f"Ошибка: Не найдены секреты в приложении: {', '.join(missing_secrets)}\n\nДобавьте их в .streamlit/secrets.toml"
-
-    client_id = st.secrets["GIGACHAT_CLIENT_ID"]
-    client_secret = st.secrets["GIGACHAT_CLIENT_SECRET"]
-
-    auth_string = f"{client_id}:{client_secret}"
-
-    # Правильное Base64 кодирование (убираем b' и trailing = если нужно)
-    import base64
-    auth_bytes = auth_string.encode('utf-8')
-    base64_bytes = base64.b64encode(auth_bytes)
-    base64_string = base64_bytes.decode('utf-8')
-
-    # Шаг 1: Получаем Access Token
-    token_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-    scope = "GIGACHAT_API_PERS"
-    rq_uid = str(uuid.uuid4())
-
-    headers = {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-        'RqUID': rq_uid,
-        'Authorization': f'Basic {base64_string}'
-    }
-
-    payload = {
-        'scope': scope
-    }
-
-    try:
-        response = request_with_retries(
-            "POST",
-            token_url,
-            headers=headers,
-            data=payload,
-            timeout=20,
-            max_attempts=3
-        )
-
-
-        if response.status_code != 200:
-            return f"Ошибка при получении токена ({response.status_code}): {response.text}"
-
-        access_token = response.json().get('access_token')
-        if not access_token:
-            return f"Не удалось получить access_token: {response.text}"
-
-        # Шаг 2: Готовим промпт
-        prompt = f"""
-        Ты — профессиональный копирайтер и маркетолог для карточек товаров на маркетплейсах.
-
-        Твоя задача — на основе анализа отзывов покупателей создать релевантный рекламный текст для объявления товара.
-
-        ТОВАР:
-        {product_name}
-
-        СИЛЬНЫЕ СТОРОНЫ ТОВАРА ПО ОТЗЫВАМ:
-        {', '.join(strengths) if strengths else 'Не выявлено'}
-
-        СЛАБЫЕ СТОРОНЫ ТОВАРА ПО ОТЗЫВАМ:
-        {', '.join(weaknesses) if weaknesses else 'Не выявлено'}
-
-        Сформируй готовый текст для объявления, а не аналитический отчет.
-
-        Структура ответа:
-
-        1. Заголовок объявления
-        Короткий цепляющий заголовок до 70 символов.
-
-        2. Основной рекламный текст
-        Предложения, которые можно использовать в описании товара или рекламном объявлении.
-
-        3. Ключевые преимущества
-        5 коротких буллитов для карточки товара или инфографики.
-
-        4. Короткий вариант для рекламы
-        Предложения для баннера, таргетированной рекламы или промопоста.
-
-        5. Призыв к действию
-        Фраза, побуждающая купить или перейти к товару.
-
-        Правила:
-        - Не пиши слово "отчет".
-        - Не пиши аналитические выводы.
-        - Не упоминай, что текст создан на основе отзывов.
-        - Не обещай того, чего нет в сильных сторонах товара.
-        - Слабые стороны учитывай аккуратно: не называй их прямо, а обходи через нейтральные формулировки.
-        - Пиши живым, понятным и продающим языком.
-        - Текст должен быть на русском языке.
-        - Используй Markdown для удобного отображения.
-        """
-
-        # Шаг 3: Отправляем запрос к GigaChat
-        chat_url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
-
-        chat_payload = {
-            "model": "GigaChat",
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.7,
-            "max_tokens": 1000
-        }
-
-        chat_headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {access_token}'
-        }
-
-        chat_response = request_with_retries(
-            "POST",
-            chat_url,
-            headers=chat_headers,
-            json=chat_payload,
-            timeout=90,
-            max_attempts=4
-        )
-        chat_response.raise_for_status()
-        result = chat_response.json()
-
-        # Извлекаем ответ из структуры GigaChat
-        if 'choices' in result and len(result['choices']) > 0:
-            return result['choices'][0]['message']['content']
-        else:
-            return "Не удалось получить корректный ответ от GigaChat. Попробуйте повторить генерацию позже."
-
-    except Exception as e:
-        return f"Произошла ошибка при работе с GigaChat API: {str(e)}"
+    return generate_marketing_content_with_gigachat(
+        product_name=product_name,
+        strengths=strengths,
+        weaknesses=weaknesses,
+        client_id=client_id,
+        client_secret=client_secret,
+    )
 
 def get_product_analytics(nm_id):
     """Получает и текст резюме, и HTML-код графика"""
