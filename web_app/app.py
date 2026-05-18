@@ -1546,62 +1546,51 @@ with st.sidebar:
 
 # --- СТРАНИЦА: ГЛАВНАЯ ---
 if st.session_state.page == "Главная":
-    st.title("Поиск и анализ отзывов Wildberries")
-    st.markdown(
-        "<p style='color: #28a745; font-style: italic; margin-bottom: 25px;'>"
-        "Введите артикул или ссылку на товар. Сервис соберёт отзывы Wildberries, "
-        "определит тональность, выделит ключевые плюсы и минусы, а затем поможет "
-        "подготовить рекламный текст и маркетинговые выводы."
-        "</p>",
-        unsafe_allow_html=True
-    )
-
-    # Метрики главной страницы
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Позиций в базе", f'{len(product_df)}')
-    m2.metric("Активность системы", "Высокая")
-    m3.metric("Точность нейро-анализа", "94%", delta="↑ 2%")
-    st.divider()
+    st.title("AI-анализ отзывов для маркетолога")
 
     st.markdown(
         """
-        <style>
-        .custom-text {
-            font-style: italic;
-            color: #707070;
-            margin-bottom: 20px;
-        }
-        </style>
-        <div class="custom-text">
-            Основной сценарий — запустить новый анализ товара по артикулу или ссылке. База ниже нужна как справочник уже обработанных товаров.
-        </div>
+        <p style='color: #5f6368; font-size: 1.05rem; margin-bottom: 20px;'>
+            Введите артикул или ссылку на товар Wildberries. Сервис соберёт отзывы,
+            определит тональность, выделит сильные и слабые стороны товара и подготовит
+            практические маркетинговые рекомендации.
+        </p>
         """,
         unsafe_allow_html=True
     )
 
-    # Главный сценарий выводим первым и шире, база — рядом как второстепенный блок
+    # Короткие понятные метрики без неподтверждённых заявлений о точности
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Товаров в базе", f"{len(product_df)}")
+    m2.metric("Минимум для анализа", f"{MIN_REVIEWS_FOR_ANALYSIS}+ отзывов")
+    m3.metric("Форматы данных", "WB + CSV/XLSX")
+
+    st.divider()
+
+    st.markdown("### Быстрый анализ товара")
+
+    st.info(
+        "Основной сценарий: вставьте ссылку или артикул товара, запустите анализ "
+        "и получите готовые выводы для карточки товара, рекламы и работы с возражениями."
+    )
+
     col_analyze, col_saved = st.columns([1.35, 1], gap="large")
 
-    # --- ЛЕВАЯ КОЛОНКА: ОСНОВНОЙ СЦЕНАРИЙ — НОВЫЙ АНАЛИЗ ---
+    # --- ЛЕВАЯ КОЛОНКА: ОСНОВНОЙ СЦЕНАРИЙ ---
     with col_analyze:
-        st.markdown("### Новый анализ товара")
-        tab_wb_search, tab_file_upload = st.tabs(["Артикул / ссылка WB", "CSV / Excel"])
+        st.markdown("#### 1. Введите товар")
 
-        with tab_wb_search:
-            st.caption(
-                f"Важно: анализ запускается только для товаров, у которых найдено не менее "
-                f"{MIN_REVIEWS_FOR_ANALYSIS} содержательных отзывов. Это нужно, чтобы выводы были статистически полезными."
-            )
-            wb_products_text = st.text_area(
-                "Артикул или ссылка Wildberries",
-                placeholder=(
-                    "175088486\n"
-                    "https://www.wildberries.ru/catalog/175088486/detail.aspx"
-                ),
-                height=120,
-                help="Можно указать один или несколько товаров: каждый артикул или ссылку с новой строки."
-            )
+        wb_products_text = st.text_area(
+            "Артикул или ссылка Wildberries",
+            placeholder=(
+                "175088486\n"
+                "https://www.wildberries.ru/catalog/175088486/detail.aspx"
+            ),
+            height=120,
+            help="Можно указать один или несколько товаров: каждый артикул или ссылку с новой строки."
+        )
 
+        with st.expander("Расширенные настройки", expanded=False):
             wb_limit = st.number_input(
                 "Лимит отзывов на товар",
                 min_value=0,
@@ -1620,62 +1609,90 @@ if st.session_state.page == "Главная":
                 help="Короткие отзывы без содержательного текста будут пропущены."
             )
 
-            if st.button(
-                    "Запустить анализ товара",
-                    type="primary",
-                    icon=":material/search:",
-                    width="stretch",
-                    key="process_wb_search"
-            ):
-                try:
-                    products = parse_wb_products_input(wb_products_text)
+        st.markdown("#### 2. Запустите анализ")
 
-                    with st.spinner("Собираю отзывы Wildberries, запускаю нейро-анализ и сохраняю результат..."):
-                        raw_df, fetch_report = fetch_wb_reviews_dataframe(
-                            products,
-                            limit=int(wb_limit),
-                            min_text_length=int(wb_min_text_length)
-                        )
+        if st.button(
+                "Проанализировать отзывы",
+                type="primary",
+                icon=":material/search:",
+                width="stretch",
+                key="process_wb_search"
+        ):
+            try:
+                products = parse_wb_products_input(wb_products_text)
 
-                        if raw_df.empty:
-                            raise ValueError("Отзывы не найдены или все отзывы были отфильтрованы по длине текста.")
-
-                        analyzed_df, product_summaries = analyze_uploaded_reviews(raw_df)
-                        save_uploaded_analysis_to_db(analyzed_df, product_summaries)
-
-                        first_product = product_summaries[0]
-                        st.session_state.current_sku = first_product["nm_id"]
-                        st.session_state.current_category = first_product["category_name"]
-                        st.session_state.upload_result_df = analyzed_df
-                        st.session_state.upload_result_filename = "wb_search_result.xlsx"
-                        st.session_state.wb_fetch_report = fetch_report
-
-                    st.success(
-                        f"Готово: обработано {len(analyzed_df)} отзывов "
-                        f"по {len(product_summaries)} товар(ам). Результат сохранён в базу."
+                with st.spinner("Собираю отзывы, определяю тональность и формирую маркетинговые выводы..."):
+                    raw_df, fetch_report = fetch_wb_reviews_dataframe(
+                        products,
+                        limit=int(wb_limit),
+                        min_text_length=int(wb_min_text_length)
                     )
 
+                    if raw_df.empty:
+                        raise ValueError("Отзывы не найдены или все отзывы были отфильтрованы по длине текста.")
 
-                except Exception as e:
+                    analyzed_df, product_summaries = analyze_uploaded_reviews(raw_df)
+                    save_uploaded_analysis_to_db(analyzed_df, product_summaries)
 
-                    st.error(str(e))
+                    first_product = product_summaries[0]
+                    st.session_state.current_sku = first_product["nm_id"]
+                    st.session_state.current_category = first_product["category_name"]
+                    st.session_state.upload_result_df = analyzed_df
+                    st.session_state.upload_result_filename = "wb_search_result.xlsx"
+                    st.session_state.wb_fetch_report = fetch_report
 
-            if "wb_fetch_report" in st.session_state:
-                with st.expander("Что было найдено на Wildberries", expanded=False):
-                    st.dataframe(pd.DataFrame(st.session_state.wb_fetch_report), width="stretch", hide_index=True)
+                st.success(
+                    f"Готово: обработано {len(analyzed_df)} отзывов "
+                    f"по {len(product_summaries)} товар(ам)."
+                )
 
-        with tab_file_upload:
-            st.markdown("##### Анализ готового файла")
+            except Exception as e:
+                st.error(str(e))
+
+        if "wb_fetch_report" in st.session_state:
+            with st.expander("Что было найдено на Wildberries", expanded=False):
+                st.dataframe(
+                    pd.DataFrame(st.session_state.wb_fetch_report),
+                    width="stretch",
+                    hide_index=True
+                )
+
+        if "upload_result_df" in st.session_state:
+            st.markdown("#### 3. Получите результат")
+
+            col_download, col_open = st.columns(2)
+
+            with col_download:
+                st.download_button(
+                    label="Скачать обработанный файл",
+                    data=dataframe_to_excel_bytes(st.session_state.upload_result_df),
+                    file_name="analyzed_reviews.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    width="stretch",
+                    icon=":material/download:"
+                )
+
+            with col_open:
+                if st.button(
+                        "Открыть аналитику",
+                        type="primary",
+                        width="stretch",
+                        icon=":material/monitoring:"
+                ):
+                    st.session_state.page = "Аналитика"
+                    st.rerun()
+
+        with st.expander("У меня уже есть файл с отзывами CSV или Excel", expanded=False):
             st.caption(
                 "Этот режим нужен, если отзывы уже собраны парсером или подготовлены вручную. "
-                "Для обычного пользователя проще использовать вкладку с артикулом или ссылкой."
+                "Желательные колонки: nmId, product_name, category_name, product_url, rating, text."
             )
 
             uploaded_files = st.file_uploader(
-                "Перетащите файл с отзывами сюда",
+                "Загрузите файл с отзывами",
                 type=["csv", "xlsx"],
                 accept_multiple_files=True,
-                help="Поддерживаются CSV и Excel. Желательные колонки: nmId, product_name, category_name, product_url, rating, text."
+                help="Поддерживаются CSV и Excel."
             )
 
             if uploaded_files:
@@ -1683,14 +1700,14 @@ if st.session_state.page == "Главная":
                     st.success(f"Файл '{uploaded_file.name}' загружен")
 
                     if st.button(
-                            f"Проанализировать и сохранить: {uploaded_file.name}",
+                            f"Проанализировать файл: {uploaded_file.name}",
                             type="primary",
                             icon=":material/database_upload:",
                             width="stretch",
                             key=f"process_upload_{uploaded_file.name}"
                     ):
                         try:
-                            with st.spinner("Загружаю модель, анализирую отзывы и сохраняю данные в базу..."):
+                            with st.spinner("Анализирую отзывы из файла и сохраняю результат..."):
                                 raw_df = read_uploaded_reviews_file(uploaded_file)
                                 analyzed_df, product_summaries = analyze_uploaded_reviews(raw_df)
                                 save_uploaded_analysis_to_db(analyzed_df, product_summaries)
@@ -1703,29 +1720,11 @@ if st.session_state.page == "Главная":
 
                             st.success(
                                 f"Готово: обработано {len(analyzed_df)} отзывов "
-                                f"по {len(product_summaries)} товар(ам). Результат сохранён в базу."
+                                f"по {len(product_summaries)} товар(ам)."
                             )
 
                         except Exception as e:
                             st.error(f"Ошибка при обработке файла: {e}")
-
-        if "upload_result_df" in st.session_state:
-            st.download_button(
-                label="Скачать обработанный файл",
-                data=dataframe_to_excel_bytes(st.session_state.upload_result_df),
-                file_name="analyzed_reviews.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                width="stretch",
-                icon=":material/download:"
-            )
-
-            if st.button(
-                    "Открыть аналитику по последнему обработанному товару",
-                    width="stretch",
-                    icon=":material/monitoring:"
-            ):
-                st.session_state.page = "Аналитика"
-                st.rerun()
 
     # --- ПРАВАЯ КОЛОНКА: ВТОРОСТЕПЕННЫЙ СЦЕНАРИЙ — ПОИСК В БАЗЕ ---
     with col_saved:
