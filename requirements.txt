@@ -1,16 +1,27 @@
-﻿beautifulsoup4
-selenium
-webdriver-manager
-requests
-retry
-streamlit
-pandas
-psycopg2-binary
-plotly==5.19.0
-transformers
-torch
-safetensors
-huggingface_hub
-openpyxl
-numpy
-SQLAlchemy
+﻿# Web interface
+streamlit>=1.49,<2.0
+
+# Data processing
+pandas>=2.2,<3.0
+numpy>=1.26,<2.0
+openpyxl>=3.1,<4.0
+
+# Database
+SQLAlchemy>=2.0,<3.0
+psycopg2-binary>=2.9,<3.0
+
+# Visualization
+plotly>=5.24,<6.0
+
+# HTTP requests and SSL certificates
+requests>=2.32,<3.0
+certifi>=2024.8.30
+
+# Machine learning and NLP
+torch>=2.3,<3.0
+transformers>=4.44,<5.0
+safetensors>=0.4,<1.0
+huggingface_hub>=0.24,<1.0
+
+# Model interpretation
+shap>=0.46,<1.0

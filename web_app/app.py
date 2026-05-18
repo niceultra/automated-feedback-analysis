@@ -169,16 +169,11 @@ def generate_marketing_content(product_name, strengths, weaknesses):
     }
 
     try:
-        # Отключаем проверку SSL (временно для тестирования)
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
         response = request_with_retries(
             "POST",
             token_url,
             headers=headers,
             data=payload,
-            verify=False,
             timeout=20,
             max_attempts=3
         )
@@ -254,17 +249,14 @@ def generate_marketing_content(product_name, strengths, weaknesses):
             'Authorization': f'Bearer {access_token}'
         }
 
-        # Повторяем запрос при ошибках SSL (частая проблема с Сбером)
         chat_response = request_with_retries(
             "POST",
             chat_url,
             headers=chat_headers,
             json=chat_payload,
-            verify=False,
             timeout=90,
             max_attempts=4
         )
-
         chat_response.raise_for_status()
         result = chat_response.json()
 
@@ -272,7 +264,7 @@ def generate_marketing_content(product_name, strengths, weaknesses):
         if 'choices' in result and len(result['choices']) > 0:
             return result['choices'][0]['message']['content']
         else:
-            return f"Неожиданный формат ответа от API: {result}"
+            return "Не удалось получить корректный ответ от GigaChat. Попробуйте повторить генерацию позже."
 
     except Exception as e:
         return f"Произошла ошибка при работе с GigaChat API: {str(e)}"
