@@ -70,6 +70,12 @@ def generate_marketing_content(product_name, strengths, weaknesses):
     """Генерирует маркетинговый комплект через GigaChat."""
     client_id = st.secrets.get("GIGACHAT_CLIENT_ID", None)
     client_secret = st.secrets.get("GIGACHAT_CLIENT_SECRET", None)
+    scope = st.secrets.get("GIGACHAT_SCOPE", "GIGACHAT_API_PERS")
+    auth_url = st.secrets.get("GIGACHAT_AUTH_URL", "https://ngw.devices.sberbank.ru:9443/api/v2/oauth")
+    api_url = st.secrets.get("GIGACHAT_API_URL", "https://gigachat.devices.sberbank.ru/api/v1/chat/completions")
+    model = st.secrets.get("GIGACHAT_MODEL", "GigaChat")
+    verify_ssl = str(st.secrets.get("GIGACHAT_VERIFY_SSL", "true")).lower() in ("1", "true", "yes", "y", "да")
+    debug = str(st.secrets.get("GIGACHAT_DEBUG", "false")).lower() in ("1", "true", "yes", "y", "да")
 
     return generate_marketing_content_with_gigachat(
         product_name=product_name,
@@ -77,6 +83,12 @@ def generate_marketing_content(product_name, strengths, weaknesses):
         weaknesses=weaknesses,
         client_id=client_id,
         client_secret=client_secret,
+        scope=scope,
+        auth_url=auth_url,
+        api_url=api_url,
+        model=model,
+        verify_ssl=verify_ssl,
+        debug=debug,
     )
 
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---

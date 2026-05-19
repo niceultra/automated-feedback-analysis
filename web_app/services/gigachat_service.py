@@ -2,7 +2,18 @@ import uuid
 import time
 import base64
 import requests
-from requests.exceptions import SSLError, ConnectionError, Timeout
+from requests.exceptions import RequestException, SSLError, ConnectionError, Timeout
+
+
+def to_bool(value, default=True):
+    """Преобразует строковые значения secrets в bool."""
+    if value is None:
+        return default
+
+    if isinstance(value, bool):
+        return value
+
+    return str(value).strip().lower() in ("1", "true", "yes", "y", "да")
 
 
 def request_with_retries(method, url, max_attempts=4, timeout=60, **kwargs):
@@ -27,14 +38,14 @@ def request_with_retries(method, url, max_attempts=4, timeout=60, **kwargs):
 
             return response
 
-        except (SSLError, ConnectionError, Timeout) as e:
+        except (SSLError, ConnectionError, Timeout, RequestException) as e:
             last_error = e
 
             if attempt < max_attempts:
                 time.sleep(2 * attempt)
                 continue
 
-            raise
+            raise RuntimeError(str(last_error))
 
     raise RuntimeError(f"Не удалось выполнить запрос после нескольких попыток: {last_error}")
 
@@ -102,19 +113,22 @@ def generate_marketing_content_with_gigachat(
     weaknesses,
     client_id,
     client_secret,
+    scope="GIGACHAT_API_PERS",
+    auth_url="https://ngw.devices.sberbank.ru:9443/api/v2/oauth",
+    api_url="https://gigachat.devices.sberbank.ru/api/v1/chat/completions",
+    model="GigaChat",
+    verify_ssl=True,
+    debug=False,
 ):
     """Генерирует маркетинговый комплект через GigaChat API."""
     if not client_id or not client_secret:
         return (
-            "Ошибка: не настроены GIGACHAT_CLIENT_ID и GIGACHAT_CLIENT_SECRET. "
+            "Ошибка GigaChat: не настроены GIGACHAT_CLIENT_ID и GIGACHAT_CLIENT_SECRET. "
             "Добавьте их в secrets приложения."
         )
 
     auth_string = f"{client_id}:{client_secret}"
     base64_string = base64.b64encode(auth_string.encode("utf-8")).decode("utf-8")
-
-    token_url = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
-    chat_url = "https://gigachat.devices.sberbank.ru/api/v1/chat/completions"
 
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
@@ -124,33 +138,42 @@ def generate_marketing_content_with_gigachat(
     }
 
     payload = {
-        "scope": "GIGACHAT_API_PERS"
+        "scope": scope
     }
 
     try:
         response = request_with_retries(
             "POST",
-            token_url,
+            auth_url,
             headers=headers,
             data=payload,
+            verify=verify_ssl,
             timeout=20,
             max_attempts=3
         )
 
         if response.status_code != 200:
+            details = response.text[:500] if debug else "Подробности скрыты. Включите GIGACHAT_DEBUG=true для диагностики."
+
             return (
-                f"Ошибка при получении токена GigaChat ({response.status_code}). "
-                f"Проверьте GIGACHAT_CLIENT_ID, GIGACHAT_CLIENT_SECRET и доступ к API."
+                f"Ошибка при получении токена GigaChat: HTTP {response.status_code}.\n\n"
+                f"Проверьте GIGACHAT_CLIENT_ID, GIGACHAT_CLIENT_SECRET, GIGACHAT_SCOPE и доступ к API.\n\n"
+                f"{details}"
             )
 
-        access_token = response.json().get("access_token")
+        token_data = response.json()
+        access_token = token_data.get("access_token")
+
         if not access_token:
-            return "Не удалось получить access_token от GigaChat."
+            return (
+                "Ошибка GigaChat: токен получен, но в ответе нет access_token. "
+                "Проверьте настройки авторизации."
+            )
 
         prompt = build_marketing_prompt(product_name, strengths, weaknesses)
 
         chat_payload = {
-            "model": "GigaChat",
+            "model": model,
             "messages": [
                 {"role": "user", "content": prompt}
             ],
@@ -166,23 +189,50 @@ def generate_marketing_content_with_gigachat(
 
         chat_response = request_with_retries(
             "POST",
-            chat_url,
+            api_url,
             headers=chat_headers,
             json=chat_payload,
+            verify=verify_ssl,
             timeout=90,
             max_attempts=4
         )
 
-        chat_response.raise_for_status()
+        if chat_response.status_code != 200:
+            details = chat_response.text[:500] if debug else "Подробности скрыты. Включите GIGACHAT_DEBUG=true для диагностики."
+
+            return (
+                f"Ошибка при генерации текста GigaChat: HTTP {chat_response.status_code}.\n\n"
+                f"Проверьте модель, доступ к API и лимиты аккаунта.\n\n"
+                f"{details}"
+            )
+
         result = chat_response.json()
 
-        if "choices" in result and len(result["choices"]) > 0:
+        try:
             return result["choices"][0]["message"]["content"]
+        except Exception:
+            details = str(result)[:500] if debug else "Ответ API получен, но его формат отличается от ожидаемого."
 
-        return "Не удалось получить корректный ответ от GigaChat. Попробуйте повторить генерацию позже."
+            return (
+                "Не удалось разобрать ответ GigaChat.\n\n"
+                f"{details}"
+            )
 
-    except Exception:
+    except Exception as e:
+        error_text = str(e)
+
+        if "CERTIFICATE_VERIFY_FAILED" in error_text or "certificate verify failed" in error_text.lower():
+            return (
+                "Ошибка SSL при подключении к GigaChat.\n\n"
+                "Сервер не смог проверить сертификат API. "
+                "Для временной проверки можно добавить в secrets параметр GIGACHAT_VERIFY_SSL=false, "
+                "но для нормальной эксплуатации лучше настроить корректные сертификаты."
+            )
+
+        if debug:
+            return f"Ошибка при обращении к GigaChat: {error_text}"
+
         return (
             "Не удалось сгенерировать маркетинговый комплект через GigaChat. "
-            "Проверьте настройки API, подключение к интернету и повторите попытку."
+            "Включите GIGACHAT_DEBUG=true в secrets, чтобы увидеть точную причину ошибки."
         )
