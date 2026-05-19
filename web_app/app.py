@@ -5,6 +5,15 @@ import pandas as pd
 from PIL import Image
 import plotly.express as px
 
+from services.marketing_service import (
+    extract_strengths_weaknesses,
+    parse_summary_stats,
+    build_marketing_recommendations,
+    build_ad_brief,
+    build_marketing_action_blocks,
+    marketing_report_to_excel_bytes,
+)
+
 from services.gigachat_service import generate_marketing_content_with_gigachat
 from services.db_service import (
     get_all_products,
@@ -70,266 +79,6 @@ def generate_marketing_content(product_name, strengths, weaknesses):
         client_secret=client_secret,
     )
 
-def extract_strengths_weaknesses(summary_text):
-    """
-    Извлекает сильные и слабые стороны из текста аналитики
-
-    Args:
-        summary_text (str): Текст аналитики из БД
-
-    Returns:
-        tuple: (список сильных сторон, список слабых сторон)
-    """
-    if not summary_text:
-        return [], []
-
-    strengths = []
-    weaknesses = []
-
-    try:
-        # Ищем раздел с ключевыми плюсами и минусами
-        strengths_start = summary_text.find("КЛЮЧЕВЫЕ ПЛЮСЫ:")
-        weaknesses_start = summary_text.find("КЛЮЧЕВЫЕ МИНУСЫ:")
-
-        if strengths_start != -1 and weaknesses_start != -1:
-            # Извлекаем текст между разделами
-            strengths_text = summary_text[strengths_start + len("КЛЮЧЕВЫЕ ПЛЮСЫ:"):weaknesses_start].strip()
-            weaknesses_text = summary_text[weaknesses_start + len("КЛЮЧЕВЫЕ МИНУСЫ:"):].strip()
-
-            # Функция для парсинга пунктов
-            def parse_points(text):
-                points = []
-                for line in text.split('\n'):
-                    line = line.strip()
-                    # Ищем строки, которые начинаются с цифры и точки/скобки
-                    if line and len(line) > 2 and line[0].isdigit() and (line[1] == '.' or line[1] == ')'):
-                        # Удаляем номер пункта
-                        point = line[2:].strip().rstrip('.')
-                        if point:
-                            points.append(point)
-                return points
-
-            # Парсим сильные стороны
-            strengths = parse_points(strengths_text)
-
-            # Парсим слабые стороны
-            weaknesses = parse_points(weaknesses_text)
-    except Exception as e:
-        st.error(f"Ошибка при извлечении данных: {str(e)}")
-
-    return strengths, weaknesses
-
-def parse_summary_stats(summary_text):
-    """
-    Извлекает числовые показатели из текстового резюме товара.
-    Поддерживает новый и старый формат summary_text.
-    """
-    stats = {
-        "total": 0,
-        "positive_count": 0,
-        "negative_count": 0,
-        "neutral_count": 0,
-        "positive_share": 0.0,
-        "negative_share": 0.0,
-        "neutral_share": 0.0,
-    }
-
-    if not summary_text:
-        return stats
-
-    text = str(summary_text)
-    text = re.sub(r"\s+", " ", text).strip()
-
-    def to_float(value):
-        try:
-            return float(str(value).replace(",", "."))
-        except Exception:
-            return 0.0
-
-    # 1. Всего отзывов: поддержка старого и нового формата
-    total_patterns = [
-        r"Всего обработано отзывов:\s*(\d+)",
-        r"Всего отзывов:\s*(\d+)",
-    ]
-
-    for pattern in total_patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            stats["total"] = int(match.group(1))
-            break
-
-    # 2. Позитивные отзывы: новый формат + старый формат
-    positive_patterns = [
-        r"Позитивные отзывы:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-        r"Позитивных:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-        r"Позитивные:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-    ]
-
-    for pattern in positive_patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            stats["positive_count"] = int(match.group(1))
-            stats["positive_share"] = to_float(match.group(2))
-            break
-
-    # 3. Негативные отзывы: новый формат + старый формат
-    negative_patterns = [
-        r"Негативные отзывы:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-        r"Негативных:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-        r"Негативные:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-    ]
-
-    for pattern in negative_patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            stats["negative_count"] = int(match.group(1))
-            stats["negative_share"] = to_float(match.group(2))
-            break
-
-    # 4. Нейтральные отзывы: новый формат + старый формат
-    neutral_patterns = [
-        r"Нейтральные отзывы:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-        r"Нейтральных:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-        r"Нейтральные:\s*(\d+)\s*\(([\d.,]+)\s*%\)",
-    ]
-
-    for pattern in neutral_patterns:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if match:
-            stats["neutral_count"] = int(match.group(1))
-            stats["neutral_share"] = to_float(match.group(2))
-            break
-
-    # 5. Если проценты не найдены, но есть количество — пересчитываем вручную
-    if stats["total"] > 0:
-        if stats["positive_share"] == 0.0 and stats["positive_count"] > 0:
-            stats["positive_share"] = round(stats["positive_count"] / stats["total"] * 100, 1)
-
-        if stats["negative_share"] == 0.0 and stats["negative_count"] > 0:
-            stats["negative_share"] = round(stats["negative_count"] / stats["total"] * 100, 1)
-
-        if stats["neutral_share"] == 0.0 and stats["neutral_count"] > 0:
-            stats["neutral_share"] = round(stats["neutral_count"] / stats["total"] * 100, 1)
-
-    return stats
-
-def build_marketing_recommendations(stats, strengths, weaknesses):
-    """Формирует понятные рекомендации для маркетолога."""
-    recommendations = []
-
-    positive_share = stats.get("positive_share", 0)
-    negative_share = stats.get("negative_share", 0)
-    total = stats.get("total", 0)
-
-    if total < 30:
-        recommendations.append(
-            "Данных пока немного: выводы лучше использовать как предварительные. "
-            "Для более точной картины желательно собрать больше отзывов."
-        )
-
-    if positive_share >= 80:
-        recommendations.append(
-            "У товара сильный позитивный фон. В рекламе можно делать акцент на доверии покупателей, качестве и подтверждённых преимуществах."
-        )
-    elif positive_share >= 60:
-        recommendations.append(
-            "Товар воспринимается преимущественно положительно, но в коммуникации стоит аккуратно закрывать возможные сомнения покупателей."
-        )
-    else:
-        recommendations.append(
-            "Позитивный фон выражен умеренно. Перед активным продвижением стоит проверить карточку товара, описание, ожидания покупателей и повторяющиеся претензии."
-        )
-
-    if negative_share >= 15:
-        recommendations.append(
-            "Доля негативных отзывов заметная. Рекомендуется использовать минусы как список возражений: уточнить описание, добавить предупреждения, улучшить инфографику и ответы на вопросы."
-        )
-    elif negative_share > 0:
-        recommendations.append(
-            "Негативные отзывы есть, но их доля невысокая. Их можно использовать для точечной доработки карточки и рекламных формулировок."
-        )
-    else:
-        recommendations.append(
-            "Существенный негатив по отзывам не выделен. Основной упор можно сделать на преимущества и сценарии использования товара."
-        )
-
-    if strengths:
-        recommendations.append(
-            "Главные преимущества для карточки товара: " + "; ".join(strengths[:3]) + "."
-        )
-
-    if weaknesses:
-        recommendations.append(
-            "Что стоит учесть в описании и рекламе: " + "; ".join(weaknesses[:3]) + "."
-        )
-
-    return recommendations
-
-
-def build_ad_brief(product_name, strengths, weaknesses, stats):
-    """Готовит краткий бриф для маркетолога."""
-    positive_share = stats.get("positive_share", 0)
-    negative_share = stats.get("negative_share", 0)
-
-    if positive_share >= 80:
-        tone = "уверенный, позитивный, с акцентом на качество и довольных покупателей"
-    elif negative_share >= 15:
-        tone = "аккуратный, объясняющий, с проработкой возражений"
-    else:
-        tone = "нейтрально-продающий, с акцентом на практическую пользу"
-
-    main_strengths = "; ".join(strengths[:5]) if strengths else "преимущества выражены слабо"
-    main_risks = "; ".join(weaknesses[:5]) if weaknesses else "существенные риски не выявлены"
-
-    return f"""Краткий маркетинговый бриф
-
-Товар: {product_name}
-
-Рекомендуемый тон коммуникации:
-{tone}
-
-Что выносить в рекламу:
-{main_strengths}
-
-Какие возражения закрывать:
-{main_risks}
-
-Рекомендация:
-Использовать сильные стороны в заголовках, карточке товара, инфографике и рекламных объявлениях. Слабые стороны не выносить напрямую в рекламу, а закрывать через уточняющие формулировки, честное описание комплектации, назначения и ожидаемого результата.
-"""
-
-
-def marketing_report_to_excel_bytes(product_name, current_sku, summary_text, reviews_df, strengths, weaknesses, recommendations):
-    """Формирует Excel-отчёт для скачивания маркетологом."""
-    output = io.BytesIO()
-
-    summary_rows = [
-        ["Товар", product_name],
-        ["Артикул", current_sku],
-        ["", ""],
-        ["Сводная аналитика", summary_text],
-        ["", ""],
-        ["Ключевые плюсы", "\n".join(strengths) if strengths else "Не выявлено"],
-        ["Ключевые минусы", "\n".join(weaknesses) if weaknesses else "Не выявлено"],
-        ["", ""],
-        ["Рекомендации", "\n".join(recommendations) if recommendations else "Нет рекомендаций"],
-    ]
-
-    summary_df = pd.DataFrame(summary_rows, columns=["Показатель", "Значение"])
-
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        summary_df.to_excel(writer, index=False, sheet_name="summary")
-
-        if reviews_df is not None and not reviews_df.empty:
-            export_reviews = reviews_df.copy()
-            export_reviews["sentiment_label"] = export_reviews["sentiment"].map({
-                0: "Нейтральный",
-                1: "Негативный",
-                2: "Позитивный"
-            })
-            export_reviews.to_excel(writer, index=False, sheet_name="reviews")
-
-    return output.getvalue()
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
 def color_sentiment(val):
     # Соответствие согласно Ledger: 1-neg, 2-pos, 0-neutral
@@ -770,12 +519,49 @@ elif st.session_state.page == "Аналитика":
                 kpi3.metric("Негатив", f'{stats["negative_share"]}%')
                 kpi4.metric("Нейтрально", f'{stats["neutral_share"]}%')
 
-                with st.expander("Рекомендации для маркетолога", expanded=True):
+                action_blocks = build_marketing_action_blocks(stats, strengths, weaknesses)
+
+                st.markdown("#### Главные выводы по товару")
+                for item in action_blocks["main_conclusions"]:
+                    st.markdown(f"- {item}")
+
+                tab_card, tab_objections, tab_ads, tab_improvements, tab_brief = st.tabs(
+                    [
+                        "Карточка товара",
+                        "Возражения",
+                        "Реклама",
+                        "Доработки",
+                        "Бриф"
+                    ]
+                )
+
+                with tab_card:
+                    st.markdown("##### Что вынести в карточку товара")
+                    for item in action_blocks["card_actions"]:
+                        st.markdown(f"- {item}")
+
+                with tab_objections:
+                    st.markdown("##### Какие возражения закрыть")
+                    for item in action_blocks["objection_actions"]:
+                        st.markdown(f"- {item}")
+
+                with tab_ads:
+                    st.markdown("##### Что использовать в рекламе")
+                    for item in action_blocks["ad_actions"]:
+                        st.markdown(f"- {item}")
+
+                with tab_improvements:
+                    st.markdown("##### Что требует доработки")
+                    for item in action_blocks["improvement_actions"]:
+                        st.markdown(f"- {item}")
+
+                with tab_brief:
+                    st.markdown("##### Краткий рекламный бриф")
+                    st.text(ad_brief)
+
+                with st.expander("Все рекомендации для маркетолога", expanded=False):
                     for rec in recommendations:
                         st.markdown(f"- {rec}")
-
-                with st.expander("Краткий рекламный бриф", expanded=False):
-                    st.text(ad_brief)
 
                 st.download_button(
                     label="Скачать Excel-отчёт для маркетолога",
@@ -801,13 +587,13 @@ elif st.session_state.page == "Аналитика":
 
                     # Основная кнопка генерации
                     if st.button(
-                            "Сгенерировать текст для объявления",
+                            "Сгенерировать рекомендации",
                             type="primary",
                             icon=":material/campaign:",
                             width="stretch",
                             key="generate_ad_text"
                     ):
-                        with st.spinner("Генерирую рекламный текст для объявления..."):
+                        with st.spinner("Генерирую маркетинговые материалы для карточки товара и рекламы..."):
                             marketing_content = generate_marketing_content(product_name, strengths, weaknesses)
 
                         st.session_state.marketing_content = marketing_content
@@ -816,12 +602,15 @@ elif st.session_state.page == "Аналитика":
 
                 # Отображаем результат, если он уже сгенерирован
                 if 'content_generated' in st.session_state and st.session_state.content_generated:
-                    st.markdown("### 📝 Текст для объявления")
+                    st.markdown("### Маркетинговые рекомендации")
+                    st.caption(
+                        "Используйте эти материалы как рабочую основу: перед публикацией проверьте факты, ограничения площадки и соответствие реальным свойствам товара."
+                    )
                     st.markdown(st.session_state.marketing_content)
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     # Текст для скачивания
-                    download_text = f"""Текст для объявления
+                    download_text = f"""Текст рекомендаций
 
                 Товар: {product_name}
                 Артикул: {current_sku}
@@ -835,7 +624,7 @@ elif st.session_state.page == "Аналитика":
                         st.download_button(
                             label="Скачать текст",
                             data=download_text.encode("utf-8"),
-                            file_name=f"ad_text_{current_sku}.txt",
+                            file_name=f"marketing_content_{current_sku}.txt",
                             mime="text/plain",
                             width="stretch",
                             icon=":material/download:",
