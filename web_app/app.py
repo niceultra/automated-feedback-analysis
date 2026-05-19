@@ -585,8 +585,6 @@ elif st.session_state.page == "Аналитика":
                     icon=":material/download:"
                 )
 
-                st.markdown("### Подготовка текстов")
-
                 if strengths or weaknesses:
                     st.caption(
                         f"Для генерации найдено: {len(strengths)} сильных сторон и "
@@ -629,7 +627,6 @@ elif st.session_state.page == "Аналитика":
                     if str(content_text).startswith(("Ошибка", "Не удалось")):
                         st.error(content_text)
                     else:
-                        st.markdown("### Готовые материалы для карточки и рекламы")
                         st.caption(
                             "Используйте эти материалы как рабочую основу. Перед публикацией проверьте факты, ограничения площадки и соответствие реальным свойствам товара."
                         )
