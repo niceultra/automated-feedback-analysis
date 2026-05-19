@@ -65,6 +65,11 @@ if 'current_sku' not in st.session_state:
 if 'current_category' not in st.session_state:
     st.session_state.current_category = None
 
+def clear_generated_content():
+    """Очищает сгенерированные тексты при смене товара."""
+    for key in ["marketing_content", "marketing_content_sku", "content_generated"]:
+        if key in st.session_state:
+            del st.session_state[key]
 
 def generate_marketing_content(product_name, strengths, weaknesses):
     """Генерирует маркетинговый комплект через GigaChat."""
@@ -223,6 +228,25 @@ if st.session_state.page == "Главная":
                 value=20,
                 step=1,
                 help="Короткие отзывы без содержательного текста будут пропущены."
+            st.markdown("##### Дополнительная оценка качества отзывов")
+
+            detect_ai_reviews = st.checkbox(
+                "Выявлять шаблонные / потенциально сгенерированные отзывы",
+                value=False,
+                help=(
+                    "Это дополнительная эвристическая проверка. "
+                    "Она не доказывает, что отзыв создан ИИ, а показывает риск шаблонности текста."
+                )
+            )
+
+            use_review_reactions = st.checkbox(
+                "Учитывать реакции пользователей и ответы продавца",
+                value=False,
+                help=(
+                    "Используются лайки, дизлайки, отметки полезности и ответы продавца, "
+                    "если эти данные доступны в собранных отзывах."
+                )
+            )
             )
 
         st.markdown("#### 2. Запустите анализ")
@@ -249,10 +273,15 @@ if st.session_state.page == "Главная":
                     if raw_df.empty:
                         raise ValueError("Отзывы не найдены или все отзывы были отфильтрованы по длине текста.")
 
-                    analyzed_df, product_summaries = analyze_uploaded_reviews(raw_df)
+                    analyzed_df, product_summaries = analyze_uploaded_reviews(
+                        raw_df,
+                        detect_ai_reviews=detect_ai_reviews,
+                        use_review_reactions=use_review_reactions
+                    )
                     save_uploaded_analysis_to_db(analyzed_df, product_summaries)
 
                     first_product = product_summaries[0]
+                    clear_generated_content()
                     st.session_state.current_sku = first_product["nm_id"]
                     st.session_state.current_category = first_product["category_name"]
                     st.session_state.upload_result_df = analyzed_df
@@ -387,7 +416,12 @@ if st.session_state.page == "Главная":
                                     key=f"btn_{row['nm_id']}",
                                     width="stretch"
                             ):
-                                st.session_state.current_sku = normalize_sku(row['nm_id'])
+                                new_sku = normalize_sku(row["nm_id"])
+
+                                if normalize_sku(st.session_state.current_sku) != new_sku:
+                                    clear_generated_content()
+
+                                st.session_state.current_sku = new_sku
                                 st.session_state.current_category = category
                                 st.rerun()
 
@@ -609,11 +643,17 @@ elif st.session_state.page == "Аналитика":
                             marketing_content = generate_marketing_content(product_name, strengths, weaknesses)
 
                         st.session_state.marketing_content = marketing_content
+                        st.session_state.marketing_content_sku = str(current_sku)
                         st.session_state.content_generated = True
                         st.rerun()
 
-                # Отображаем результат, если он уже сгенерирован
-                if 'content_generated' in st.session_state and st.session_state.content_generated:
+                has_generated_content = (
+                        st.session_state.get("content_generated")
+                        and st.session_state.get("marketing_content_sku") == str(current_sku)
+                        and st.session_state.get("marketing_content")
+                )
+
+                if has_generated_content:
                     st.caption(
                         "Используйте эти материалы как рабочую основу: перед публикацией проверьте факты, ограничения площадки и соответствие реальным свойствам товара."
                     )

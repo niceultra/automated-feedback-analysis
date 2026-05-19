@@ -441,10 +441,15 @@ def prepare_uploaded_reviews_dataframe(df):
     return result.reset_index(drop=True)
 
 
-def analyze_uploaded_reviews(df):
+def analyze_uploaded_reviews(
+    df,
+    detect_ai_reviews=False,
+    use_review_reactions=False
+):
     """
     Анализирует отзывы BERT-моделью и готовит сводки по товарам.
-    Если по товару меньше MIN_REVIEWS_FOR_ANALYSIS отзывов, товар не анализируется.
+    Дополнительная оценка качества отзывов включается только по флагам,
+    чтобы не замедлять основной анализ.
     """
     prepared_df = prepare_uploaded_reviews_dataframe(df)
 
@@ -476,7 +481,13 @@ def analyze_uploaded_reviews(df):
     prepared_df = prepared_df[
         prepared_df["nm_id"].astype(str).isin(valid_nm_ids)
     ].reset_index(drop=True)
-    prepared_df = enrich_reviews_quality(prepared_df)
+
+    if detect_ai_reviews or use_review_reactions:
+        prepared_df = enrich_reviews_quality(
+            prepared_df,
+            detect_ai_reviews=detect_ai_reviews,
+            use_review_reactions=use_review_reactions
+        )
 
     if not skipped_items.empty:
         skipped_text = "\n".join(

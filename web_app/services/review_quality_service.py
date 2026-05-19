@@ -116,36 +116,45 @@ def safe_int(value, default=0):
         return default
 
 
-def enrich_reviews_quality(df):
+def enrich_reviews_quality(
+    df,
+    detect_ai_reviews=False,
+    use_review_reactions=False
+):
     """
-    Добавляет признаки качества отзывов:
-    - оценка шаблонности;
-    - реакция пользователей;
-    - наличие ответа продавца/представителя.
+    Добавляет признаки качества отзывов только по выбранным пользователем режимам.
+
+    detect_ai_reviews=True:
+    - считает признаки шаблонности / возможной искусственной генерации текста.
+
+    use_review_reactions=True:
+    - учитывает лайки, дизлайки, полезность и ответы продавца, если эти данные есть.
     """
     result = df.copy()
 
     if "review_text" not in result.columns:
         return result
 
-    result["ai_suspicion_score"] = result["review_text"].apply(estimate_generated_review_score)
-    result["ai_suspicion_label"] = result["ai_suspicion_score"].apply(label_generated_review_risk)
+    if detect_ai_reviews:
+        result["ai_suspicion_score"] = result["review_text"].apply(estimate_generated_review_score)
+        result["ai_suspicion_label"] = result["ai_suspicion_score"].apply(label_generated_review_risk)
 
-    if "helpful_count" not in result.columns:
-        result["helpful_count"] = 0
+    if use_review_reactions:
+        if "helpful_count" not in result.columns:
+            result["helpful_count"] = 0
 
-    if "unhelpful_count" not in result.columns:
-        result["unhelpful_count"] = 0
+        if "unhelpful_count" not in result.columns:
+            result["unhelpful_count"] = 0
 
-    if "answer_text" not in result.columns:
-        result["answer_text"] = ""
+        if "answer_text" not in result.columns:
+            result["answer_text"] = ""
 
-    result["helpful_count"] = result["helpful_count"].apply(safe_int)
-    result["unhelpful_count"] = result["unhelpful_count"].apply(safe_int)
-    result["answer_text"] = result["answer_text"].fillna("").astype(str).str.strip()
+        result["helpful_count"] = result["helpful_count"].apply(safe_int)
+        result["unhelpful_count"] = result["unhelpful_count"].apply(safe_int)
+        result["answer_text"] = result["answer_text"].fillna("").astype(str).str.strip()
 
-    result["answer_count"] = result["answer_text"].apply(lambda value: 1 if value else 0)
-    result["reaction_score"] = result["helpful_count"] - result["unhelpful_count"]
+        result["answer_count"] = result["answer_text"].apply(lambda value: 1 if value else 0)
+        result["reaction_score"] = result["helpful_count"] - result["unhelpful_count"]
 
     return result
 
