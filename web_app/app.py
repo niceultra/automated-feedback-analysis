@@ -71,12 +71,22 @@ def generate_marketing_content(product_name, strengths, weaknesses):
     client_id = st.secrets.get("GIGACHAT_CLIENT_ID", None)
     client_secret = st.secrets.get("GIGACHAT_CLIENT_SECRET", None)
 
+    verify_ssl = str(
+        st.secrets.get("GIGACHAT_VERIFY_SSL", "true")
+    ).strip().lower() in ("1", "true", "yes", "y", "да")
+
+    debug = str(
+        st.secrets.get("GIGACHAT_DEBUG", "false")
+    ).strip().lower() in ("1", "true", "yes", "y", "да")
+
     return generate_marketing_content_with_gigachat(
         product_name=product_name,
         strengths=strengths,
         weaknesses=weaknesses,
         client_id=client_id,
         client_secret=client_secret,
+        verify_ssl=verify_ssl,
+        debug=debug,
     )
 
 # --- ФУНКЦИИ ХЕЛПЕРЫ ---
