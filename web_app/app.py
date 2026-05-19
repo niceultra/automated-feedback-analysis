@@ -9,8 +9,6 @@ from services.marketing_service import (
     extract_strengths_weaknesses,
     parse_summary_stats,
     build_marketing_recommendations,
-    build_ad_brief,
-    build_marketing_action_blocks,
     marketing_report_to_excel_bytes,
 )
 
@@ -547,18 +545,17 @@ elif st.session_state.page == "Аналитика":
             with col_text:
                 st.markdown(f'<div class="result-box">{summary_text}</div>', unsafe_allow_html=True)
 
-                # --- ГЕНЕРАЦИЯ МАРКЕТИНГОВОГО КОНТЕНТА ---
-                st.markdown('<div class="section-title">Генерация маркетингового контента</div>',
-                            unsafe_allow_html=True)
+                # --- МАТЕРИАЛЫ ДЛЯ КАРТОЧКИ И РЕКЛАМЫ ---
+                st.markdown(
+                    '<div class="section-title">Материалы для карточки и рекламы</div>',
+                    unsafe_allow_html=True
+                )
 
-                # Извлекаем сильные и слабые стороны
                 strengths, weaknesses = extract_strengths_weaknesses(summary_text)
-
                 stats = parse_summary_stats(summary_text)
                 recommendations = build_marketing_recommendations(stats, strengths, weaknesses)
-                ad_brief = build_ad_brief(product_name, strengths, weaknesses, stats)
 
-                st.markdown("### Маркетинговая интерпретация")
+                st.markdown("### Краткая статистика по отзывам")
 
                 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
                 kpi1.metric("Всего отзывов", stats["total"])
@@ -566,49 +563,10 @@ elif st.session_state.page == "Аналитика":
                 kpi3.metric("Негатив", f'{stats["negative_share"]}%')
                 kpi4.metric("Нейтрально", f'{stats["neutral_share"]}%')
 
-                action_blocks = build_marketing_action_blocks(stats, strengths, weaknesses)
-
-                st.markdown("#### Главные выводы по товару")
-                for item in action_blocks["main_conclusions"]:
-                    st.markdown(f"- {item}")
-
-                tab_card, tab_objections, tab_ads, tab_improvements, tab_brief = st.tabs(
-                    [
-                        "Карточка товара",
-                        "Возражения",
-                        "Реклама",
-                        "Доработки",
-                        "Бриф"
-                    ]
+                st.caption(
+                    "Ниже можно подготовить отдельные тексты для карточки товара, инфографики, рекламы и работы с возражениями. "
+                    "Эти материалы формируются отдельно на основе выделенных плюсов и минусов."
                 )
-
-                with tab_card:
-                    st.markdown("##### Что вынести в карточку товара")
-                    for item in action_blocks["card_actions"]:
-                        st.markdown(f"- {item}")
-
-                with tab_objections:
-                    st.markdown("##### Какие возражения закрыть")
-                    for item in action_blocks["objection_actions"]:
-                        st.markdown(f"- {item}")
-
-                with tab_ads:
-                    st.markdown("##### Что использовать в рекламе")
-                    for item in action_blocks["ad_actions"]:
-                        st.markdown(f"- {item}")
-
-                with tab_improvements:
-                    st.markdown("##### Что требует доработки")
-                    for item in action_blocks["improvement_actions"]:
-                        st.markdown(f"- {item}")
-
-                with tab_brief:
-                    st.markdown("##### Краткий рекламный бриф")
-                    st.text(ad_brief)
-
-                with st.expander("Все рекомендации для маркетолога", expanded=False):
-                    for rec in recommendations:
-                        st.markdown(f"- {rec}")
 
                 st.download_button(
                     label="Скачать Excel-отчёт для маркетолога",
@@ -627,26 +585,37 @@ elif st.session_state.page == "Аналитика":
                     icon=":material/download:"
                 )
 
-                # Проверяем, есть ли данные для генерации
-                # Проверяем, есть ли данные для генерации
-                if strengths or weaknesses:
-                    st.caption(f"Найдено: {len(strengths)} сильных сторон и {len(weaknesses)} слабых сторон")
+                st.markdown("### Подготовка текстов")
 
-                    # Основная кнопка генерации
+                if strengths or weaknesses:
+                    st.caption(
+                        f"Для генерации найдено: {len(strengths)} сильных сторон и "
+                        f"{len(weaknesses)} возможных возражений."
+                    )
+
                     if st.button(
-                            "Сгенерировать материалы для карточки и рекламы",
+                            "Подготовить материалы для карточки и рекламы",
                             type="primary",
                             icon=":material/campaign:",
                             width="stretch",
-                            key="generate_ad_text"
+                            key=f"generate_ad_text_{current_sku}"
                     ):
-                        with st.spinner("Генерирую маркетинговые материалы для карточки товара и рекламы..."):
-                            marketing_content = generate_marketing_content(product_name, strengths, weaknesses)
+                        with st.spinner("Готовлю материалы для карточки товара, инфографики и рекламы..."):
+                            marketing_content = generate_marketing_content(
+                                product_name,
+                                strengths,
+                                weaknesses
+                            )
 
                         st.session_state.marketing_content = marketing_content
                         st.session_state.marketing_content_sku = str(current_sku)
                         st.session_state.content_generated = True
                         st.rerun()
+                else:
+                    st.info(
+                        "Для подготовки материалов пока не хватает выделенных преимуществ или возражений. "
+                        "Попробуйте проанализировать больше содержательных отзывов."
+                    )
 
                 has_generated_content = (
                         st.session_state.get("content_generated")
@@ -655,46 +624,56 @@ elif st.session_state.page == "Аналитика":
                 )
 
                 if has_generated_content:
-                    st.caption(
-                        "Используйте эти материалы как рабочую основу: перед публикацией проверьте факты, ограничения площадки и соответствие реальным свойствам товара."
-                    )
-                    st.markdown(st.session_state.marketing_content)
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    content_text = st.session_state.marketing_content
 
-                    # Текст для скачивания
-                    download_text = f"""Текст для карточки и рекламы
+                    if str(content_text).startswith(("Ошибка", "Не удалось")):
+                        st.error(content_text)
+                    else:
+                        st.markdown("### Готовые материалы для карточки и рекламы")
+                        st.caption(
+                            "Используйте эти материалы как рабочую основу. Перед публикацией проверьте факты, ограничения площадки и соответствие реальным свойствам товара."
+                        )
+
+                        st.markdown(content_text)
+
+                        download_text = f"""Материалы для карточки и рекламы
                 Товар: {product_name}
                 Артикул: {current_sku}
 
-                {st.session_state.marketing_content}
+                {content_text}
                 """
 
-                    col1, col2 = st.columns([1, 1])
+                        col1, col2 = st.columns([1, 1])
 
-                    with col1:
-                        st.download_button(
-                            label="Скачать текст",
-                            data=download_text.encode("utf-8"),
-                            file_name=f"marketing_content_{current_sku}.txt",
-                            mime="text/plain",
-                            width="stretch",
-                            icon=":material/download:",
-                            key="download_ad_text"
-                        )
-
-                    with col2:
-                        if st.button(
-                                "Сгенерировать другой вариант",
+                        with col1:
+                            st.download_button(
+                                label="Скачать материалы",
+                                data=download_text.encode("utf-8"),
+                                file_name=f"card_and_ads_materials_{current_sku}.txt",
+                                mime="text/plain",
                                 width="stretch",
-                                icon=":material/refresh:",
-                                key="regenerate_ad_text"
-                        ):
-                            with st.spinner("Генерирую другой вариант текста..."):
-                                marketing_content = generate_marketing_content(product_name, strengths, weaknesses)
+                                icon=":material/download:",
+                                key=f"download_ad_text_{current_sku}"
+                            )
 
-                            st.session_state.marketing_content = marketing_content
-                            st.session_state.content_generated = True
-                            st.rerun()
+                        with col2:
+                            if st.button(
+                                    "Подготовить другой вариант",
+                                    width="stretch",
+                                    icon=":material/refresh:",
+                                    key=f"regenerate_ad_text_{current_sku}"
+                            ):
+                                with st.spinner("Готовлю другой вариант материалов..."):
+                                    marketing_content = generate_marketing_content(
+                                        product_name,
+                                        strengths,
+                                        weaknesses
+                                    )
+
+                                st.session_state.marketing_content = marketing_content
+                                st.session_state.marketing_content_sku = str(current_sku)
+                                st.session_state.content_generated = True
+                                st.rerun()
             # 3. Исходные отзывы
             with st.expander("Подробная статистика отзывов"):
                 if reviews_df is not None and not reviews_df.empty:
