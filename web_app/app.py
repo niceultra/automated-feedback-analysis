@@ -589,7 +589,7 @@ elif st.session_state.page == "Аналитика":
 
                     # Основная кнопка генерации
                     if st.button(
-                            "Сгенерировать рекомендации",
+                            "Сгенерировать текст объявления",
                             type="primary",
                             icon=":material/campaign:",
                             width="stretch",
