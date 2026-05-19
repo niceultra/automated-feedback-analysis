@@ -203,7 +203,7 @@ if st.session_state.page == "Главная":
                 max_value=5000,
                 value=0,
                 step=50,
-                help="0 — собрать все найденные отзывы. Для быстрой проверки можно поставить 100–300."
+                help="0 — собрать все найденные отзывы. Если установлен лимит меньше 400, товар может не пройти минимальный порог анализа."
             )
 
             wb_min_text_length = st.number_input(
@@ -233,6 +233,8 @@ if st.session_state.page == "Главная":
                         limit=int(wb_limit),
                         min_text_length=int(wb_min_text_length)
                     )
+
+                    st.session_state.wb_fetch_report = fetch_report
 
                     if raw_df.empty:
                         raise ValueError("Отзывы не найдены или все отзывы были отфильтрованы по длине текста.")
