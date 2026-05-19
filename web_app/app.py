@@ -599,7 +599,7 @@ elif st.session_state.page == "Аналитика":
 
                     # Основная кнопка генерации
                     if st.button(
-                            "Сгенерировать текст объявления",
+                            "Сгенерировать материалы для карточки и рекламы",
                             type="primary",
                             icon=":material/campaign:",
                             width="stretch",
@@ -614,7 +614,6 @@ elif st.session_state.page == "Аналитика":
 
                 # Отображаем результат, если он уже сгенерирован
                 if 'content_generated' in st.session_state and st.session_state.content_generated:
-                    st.markdown("### Маркетинговые рекомендации")
                     st.caption(
                         "Используйте эти материалы как рабочую основу: перед публикацией проверьте факты, ограничения площадки и соответствие реальным свойствам товара."
                     )
@@ -622,8 +621,7 @@ elif st.session_state.page == "Аналитика":
                     st.markdown('</div>', unsafe_allow_html=True)
 
                     # Текст для скачивания
-                    download_text = f"""Текст рекомендаций
-
+                    download_text = f"""Текст для карточки и рекламы
                 Товар: {product_name}
                 Артикул: {current_sku}
 
