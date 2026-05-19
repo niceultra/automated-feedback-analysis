@@ -2,6 +2,7 @@ import io
 import re
 import streamlit as st
 import pandas as pd
+from services.review_quality_service import enrich_reviews_quality
 
 
 # Модель BERT для анализа тональности отзывов.
@@ -475,6 +476,7 @@ def analyze_uploaded_reviews(df):
     prepared_df = prepared_df[
         prepared_df["nm_id"].astype(str).isin(valid_nm_ids)
     ].reset_index(drop=True)
+    prepared_df = enrich_reviews_quality(prepared_df)
 
     if not skipped_items.empty:
         skipped_text = "\n".join(

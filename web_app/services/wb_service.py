@@ -192,6 +192,40 @@ def make_wb_review_text(feedback: dict[str, Any]) -> str:
 
     return first_text(" ".join(part for part in [pros, cons, comment] if part))
 
+def first_int_from_feedback(feedback: dict[str, Any], keys: list[str]) -> int:
+    """Безопасно достаёт числовое поле из отзыва WB."""
+    for key in keys:
+        value = feedback.get(key)
+
+        try:
+            if value is not None and str(value).strip() != "":
+                return int(float(value))
+        except Exception:
+            continue
+
+    return 0
+
+
+def extract_answer_text(feedback: dict[str, Any]) -> str:
+    """Достаёт текст ответа продавца/представителя, если WB его отдаёт."""
+    answer = feedback.get("answer") or feedback.get("supplierAnswer") or feedback.get("sellerAnswer")
+
+    if isinstance(answer, dict):
+        return first_text(
+            answer.get("text"),
+            answer.get("message"),
+            answer.get("answerText"),
+            answer.get("content")
+        )
+
+    if isinstance(answer, str):
+        return first_text(answer)
+
+    return first_text(
+        feedback.get("answerText"),
+        feedback.get("supplierAnswerText"),
+        feedback.get("sellerAnswerText")
+    )
 
 def flatten_wb_feedback_for_app(
     feedback: dict[str, Any],
@@ -204,6 +238,18 @@ def flatten_wb_feedback_for_app(
     if len(text) < min_text_length:
         return None
 
+    helpful_count = first_int_from_feedback(
+        feedback,
+        ["likes", "likeCount", "helpfulCount", "positiveVotes", "votesPlus", "pluses"]
+    )
+
+    unhelpful_count = first_int_from_feedback(
+        feedback,
+        ["dislikes", "dislikeCount", "unhelpfulCount", "negativeVotes", "votesMinus", "minuses"]
+    )
+
+    answer_text = extract_answer_text(feedback)
+
     return {
         "nmId": product_info["nmId"],
         "product_name": product_info["product_name"],
@@ -211,8 +257,10 @@ def flatten_wb_feedback_for_app(
         "product_url": product_info["product_url"],
         "rating": feedback.get("productValuation") or "",
         "text": text,
+        "helpful_count": helpful_count,
+        "unhelpful_count": unhelpful_count,
+        "answer_text": answer_text,
     }
-
 
 def parse_wb_products_input(raw_text: str) -> list[str]:
     """Разбирает пользовательский ввод: ссылки/артикулы через строки, пробелы, запятые или ;."""
@@ -297,7 +345,16 @@ def fetch_wb_reviews_dataframe(
 
     df = pd.DataFrame(
         all_rows,
-        columns=["nmId", "product_name", "category_name", "product_url", "rating", "text"]
+        columns=[
+            "nmId",
+            "product_name",
+            "category_name",
+            "product_url",
+            "rating",
+            "text",
+            "helpful_count",
+            "unhelpful_count",
+            "answer_text",
+        ]
     )
-
     return df, fetch_report
