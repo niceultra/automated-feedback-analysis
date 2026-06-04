@@ -245,6 +245,269 @@ def unique_nonempty_points(points, limit=5):
 
     return result
 
+SHAP_PHRASE_STOPWORDS = set("""
+и в во на но а я мы вы он она они оно это этот эта эти тот та те
+тут там как что чтобы потому если или либо уже еще ещё очень просто
+прямо вообще совсем реально товар товары вещь штука штуки заказ заказала
+заказал купила купил брала брал пришел пришла пришло пришли спасибо
+пожалуйста рекомендую советую
+""".split())
+
+SHAP_NEGATION_WORDS = {"не", "нет", "без", "ни"}
+
+
+def _flatten_shap_values(values):
+    """Приводит SHAP values к одномерному массиву."""
+    import numpy as np
+
+    arr = np.asarray(values, dtype=float)
+
+    if arr.ndim == 0:
+        return np.array([float(arr)])
+
+    if arr.ndim == 1:
+        return arr
+
+    if arr.ndim == 2 and arr.shape[1] == 1:
+        return arr[:, 0]
+
+    return arr.reshape(arr.shape[0], -1).mean(axis=1)
+
+
+def _token_to_text(token):
+    """Приводит токен SHAP к обычному тексту."""
+    text = str(token)
+    text = text.replace("##", "")
+    text = text.replace("▁", " ")
+    text = text.replace("Ġ", " ")
+    return text
+
+
+def _tokens_to_phrase(tokens):
+    """Собирает короткую фразу из токенов."""
+    phrase = " ".join(_token_to_text(token) for token in tokens)
+    phrase = re.sub(r"\s+", " ", phrase).strip()
+
+    phrase = re.sub(r"\s+([.,!?;:%)])", r"\1", phrase)
+    phrase = re.sub(r"([(])\s+", r"\1", phrase)
+
+    phrase = phrase.strip(" .,!?:;—-–«»\"'()[]{}")
+    phrase = phrase.lower()
+
+    phrase = re.sub(r"^(и|а|но|это|всё|все|просто)\s+", "", phrase)
+    phrase = re.sub(r"\s+", " ", phrase).strip()
+
+    return phrase
+
+
+def _phrase_words(phrase):
+    return re.findall(r"[a-zа-яё0-9]+", str(phrase).lower())
+
+
+def _is_meaningful_shap_phrase(phrase, max_words=8, max_chars=90):
+    """Проверяет, что фраза не мусорная и не слишком длинная."""
+    phrase = str(phrase).strip()
+
+    if not phrase:
+        return False
+
+    if len(phrase) > max_chars:
+        return False
+
+    words = _phrase_words(phrase)
+
+    if not words:
+        return False
+
+    if len(words) > max_words:
+        return False
+
+    meaningful_words = [
+        word for word in words
+        if (
+            word not in SHAP_PHRASE_STOPWORDS
+            or word in SHAP_NEGATION_WORDS
+        )
+        and not word.isdigit()
+    ]
+
+    if not meaningful_words:
+        return False
+
+    if len(words) == 1 and len(meaningful_words[0]) < 4:
+        return False
+
+    return True
+
+
+def _split_shap_chunks(tokens, values, max_chunk_tokens=18):
+    """
+    Делит отзыв на короткие смысловые куски по пунктуации.
+    Это нужно, чтобы SHAP не возвращал весь отзыв целиком.
+    """
+    chunks = []
+    current_tokens = []
+    current_values = []
+
+    for token, value in zip(tokens, values):
+        token_text = _token_to_text(token)
+
+        token_without_punct = re.sub(r"[,.!?;:\n\r]+", " ", token_text)
+
+        if token_without_punct.strip():
+            current_tokens.append(token_without_punct)
+            current_values.append(float(value))
+
+        has_separator = re.search(r"[,.!?;:\n\r]+", token_text) is not None
+
+        if has_separator and current_tokens:
+            chunks.append((current_tokens, current_values))
+            current_tokens = []
+            current_values = []
+            continue
+
+        if len(current_tokens) >= max_chunk_tokens:
+            chunks.append((current_tokens, current_values))
+            current_tokens = []
+            current_values = []
+
+    if current_tokens:
+        chunks.append((current_tokens, current_values))
+
+    return chunks
+
+
+def _best_shap_window(tokens, values, sign=1, max_words=7):
+    """
+    Находит внутри куска короткое окно с максимальным SHAP-вкладом.
+
+    sign = 1  -> ищем фразы, повышающие вероятность позитивного класса
+    sign = -1 -> ищем фразы, понижающие вероятность позитивного класса
+    """
+    best_phrase = ""
+    best_score = 0.0
+
+    n = min(len(tokens), len(values))
+
+    for start in range(n):
+        word_count = 0
+        value_sum = 0.0
+        window_tokens = []
+
+        for end in range(start, n):
+            token_text = _token_to_text(tokens[end])
+            token_words = _phrase_words(token_text)
+
+            if token_words:
+                word_count += len(token_words)
+
+            if word_count > max_words:
+                break
+
+            window_tokens.append(token_text)
+            value_sum += float(values[end])
+
+            phrase = _tokens_to_phrase(window_tokens)
+
+            if not _is_meaningful_shap_phrase(phrase, max_words=max_words):
+                continue
+
+            signed_score = sign * value_sum
+
+            if signed_score <= 0:
+                continue
+
+            # Небольшой штраф за слишком длинные фразы,
+            # чтобы выбирались именно короткие ключевые фрагменты.
+            normalized_score = signed_score / max(word_count, 1) ** 0.35
+
+            if normalized_score > best_score:
+                best_score = normalized_score
+                best_phrase = phrase
+
+    return best_phrase, best_score
+
+
+def _extract_shap_phrase_candidates(example, sign=1):
+    """
+    Из одного SHAP Explanation извлекает короткие фразы,
+    а не весь отзыв.
+    """
+    values = _flatten_shap_values(example.values)
+    tokens = list(example.data)
+
+    n = min(len(tokens), len(values))
+
+    if n == 0:
+        return []
+
+    tokens = tokens[:n]
+    values = values[:n]
+
+    chunks = _split_shap_chunks(tokens, values)
+    candidates = []
+
+    for chunk_tokens, chunk_values in chunks:
+        phrase, score = _best_shap_window(
+            chunk_tokens,
+            chunk_values,
+            sign=sign,
+            max_words=7
+        )
+
+        if phrase and score > 0:
+            candidates.append((phrase, score))
+
+    return candidates
+
+
+def _phrase_similarity_key(phrase):
+    """Ключ для удаления дублей похожих фраз."""
+    words = [
+        word for word in _phrase_words(phrase)
+        if word not in SHAP_PHRASE_STOPWORDS
+    ]
+
+    return " ".join(word[:6] for word in words)
+
+
+def _are_phrases_similar(phrase_a, phrase_b):
+    words_a = set(_phrase_similarity_key(phrase_a).split())
+    words_b = set(_phrase_similarity_key(phrase_b).split())
+
+    if not words_a or not words_b:
+        return False
+
+    intersection = words_a & words_b
+    smaller = min(len(words_a), len(words_b))
+
+    return len(intersection) / max(smaller, 1) >= 0.75
+
+
+def _rank_unique_shap_phrases(candidates, limit=5):
+    """Сортирует SHAP-фразы по силе вклада и убирает повторы."""
+    candidates = sorted(candidates, key=lambda item: item[1], reverse=True)
+
+    result = []
+
+    for phrase, score in candidates:
+        phrase = str(phrase).strip().lower()
+        phrase = re.sub(r"\s+", " ", phrase)
+        phrase = phrase.strip(" .,!?:;—-–")
+
+        if not _is_meaningful_shap_phrase(phrase):
+            continue
+
+        if any(_are_phrases_similar(phrase, existing) for existing in result):
+            continue
+
+        result.append(phrase)
+
+        if len(result) >= limit:
+            break
+
+    return result
+
 
 def fallback_pros_cons_from_reviews(group_df, top_k=5):
     """
@@ -284,10 +547,15 @@ def fallback_pros_cons_from_reviews(group_df, top_k=5):
 def pros_cons_from_reviews(texts, n_samples=50, top_k=5):
     """
     Извлекает ключевые плюсы и минусы через SHAP.
-    Если SHAP не сработает, возвращает пустые списки.
+
+    Важно:
+    - не возвращает отзывы целиком;
+    - использует SHAP values на уровне токенов;
+    - собирает короткие фразы до 7 слов;
+    - плюсы = фразы, повышающие вероятность позитивного класса;
+    - минусы = фразы, понижающие вероятность позитивного класса.
     """
     import random
-    import numpy as np
 
     valid_texts = []
 
@@ -315,23 +583,22 @@ def pros_cons_from_reviews(texts, n_samples=50, top_k=5):
     except Exception:
         return [], []
 
-    scored_sentences = []
+    positive_candidates = []
+    negative_candidates = []
 
-    for index, example in enumerate(shap_values):
-        total_impact = float(np.sum(example.values))
-        clean_text = normalize_review_point(texts_for_shap[index], max_len=300)
+    for example in shap_values:
+        positive_candidates.extend(
+            _extract_shap_phrase_candidates(example, sign=1)
+        )
 
-        if clean_text:
-            scored_sentences.append((clean_text, total_impact))
+        negative_candidates.extend(
+            _extract_shap_phrase_candidates(example, sign=-1)
+        )
 
-    pros_raw = sorted(scored_sentences, key=lambda item: item[1], reverse=True)
-    cons_raw = sorted(scored_sentences, key=lambda item: item[1])
-
-    pros = unique_nonempty_points([text for text, score in pros_raw if score > 0.1], limit=top_k)
-    cons = unique_nonempty_points([text for text, score in cons_raw if score < 0], limit=top_k)
+    pros = _rank_unique_shap_phrases(positive_candidates, limit=top_k)
+    cons = _rank_unique_shap_phrases(negative_candidates, limit=top_k)
 
     return pros, cons
-
 
 def build_summary_text(product_name, group_df, product_category=""):
     """
@@ -352,14 +619,6 @@ def build_summary_text(product_name, group_df, product_category=""):
         top_k=5
     )
 
-    if len(pros) < 3 or len(cons) < 2:
-        fallback_pros, fallback_cons = fallback_pros_cons_from_reviews(group_df, top_k=5)
-
-        if len(pros) < 3:
-            pros = unique_nonempty_points(pros + fallback_pros, limit=5)
-
-        if len(cons) < 2:
-            cons = unique_nonempty_points(cons + fallback_cons, limit=5)
 
     if not pros:
         pros = ["Позитивные особенности товара по загруженным отзывам выражены слабо"]
